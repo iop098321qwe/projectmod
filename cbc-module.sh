@@ -184,5 +184,6 @@ mkmod() {
     "  Path: $target_dir" \
     "  Repo: ${repo_url:-$repo_name}"
 
-  yazi "$target_dir"
+  cd "$target_dir" || return 1
+  yazi
 }
