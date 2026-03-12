@@ -46,7 +46,7 @@ mkmod() {
   # Preflight: required tools
   # --------------------------------------------------------------------------
   local cmd
-  for cmd in gum git gh; do
+  for cmd in gum git gh yazi; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: missing required command: $cmd"
       return 1
@@ -183,4 +183,6 @@ mkmod() {
   cbc_style_box "$CATPPUCCIN_GREEN" "Module created successfully!" \
     "  Path: $target_dir" \
     "  Repo: ${repo_url:-$repo_name}"
+
+  yazi "$target_dir"
 }
