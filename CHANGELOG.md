@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.2](https://github.com/iop098321qwe/projectmod/compare/v0.0.1...v0.0.2) (2026-03-12)
+
+
+### Features
+
+* **function:** open yazi after module bootstrap ([06e48f1](https://github.com/iop098321qwe/projectmod/commit/06e48f14a2c5b3c88b5ee99037fafb5aa90af378))
+
+
+### Bug Fixes
+
+* **function:** ensure `mkmod` will change directory to new project before running yazi ([3c06c48](https://github.com/iop098321qwe/projectmod/commit/3c06c4848c0e906e8aba853c90ccf70b2c9c88da))
+
 ## 0.0.1 (2026-03-12)
 
 
