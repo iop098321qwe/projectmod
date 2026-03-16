@@ -142,6 +142,31 @@ mkmod() {
   fi
 
   # --------------------------------------------------------------------------
+  # License creation (gh-license extension)
+  # --------------------------------------------------------------------------
+  if ! gh license --help >/dev/null 2>&1; then
+    cbc_style_message "$CATPPUCCIN_YELLOW" "gh license extension not found."
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Install with: gh extension install Shresht7/gh-license"
+
+    if ! gum confirm "Install gh-license extension now?"; then
+      cbc_style_message "$CATPPUCCIN_YELLOW" "License creation will be unavailable until gh-license is installed."
+      return 0
+    fi
+
+    if ! gum spin --spinner dot --title "Installing gh-license extension..." -- \
+      gh extension install Shresht7/gh-license; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install gh-license extension."
+      return 1
+    fi
+  fi
+
+  if ! gum spin --spinner dot --title "Creating GPL-3.0 license..." -- \
+    bash -c "cd \"$target_dir\" && gh license create gpl-3.0 && git add LICENSE && git commit -m 'add GPL-3.0 license'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: License creation failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
   # Git flow init with defaults
   # --------------------------------------------------------------------------
   if ! gum spin --spinner dot --title "Initializing git-flow..." -- \
