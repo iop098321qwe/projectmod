@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.3](https://github.com/iop098321qwe/projectmod/compare/v0.0.2...v0.0.3) (2026-03-16)
+
+
+### Features
+
+* **function:** add license creation to module project bootstrapping ([5929e82](https://github.com/iop098321qwe/projectmod/commit/5929e823f4e570136d6397100fc4268028171555))
+* switch to develop branch before completion ([fd3066e](https://github.com/iop098321qwe/projectmod/commit/fd3066e2298b7624df7e07d80ddaf9a54136f0f0))
+
 ## [0.0.2](https://github.com/iop098321qwe/projectmod/compare/v0.0.1...v0.0.2) (2026-03-12)
 
 
