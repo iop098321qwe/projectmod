@@ -199,6 +199,12 @@ mkmod() {
     return 1
   fi
 
+  if ! gum spin --spinner dot --title "Switching to develop branch..." -- \
+    git -C "$target_dir" checkout develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to switch to develop branch."
+    return 1
+  fi
+
   # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
