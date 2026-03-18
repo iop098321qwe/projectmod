@@ -142,6 +142,31 @@ mkmod() {
   fi
 
   # --------------------------------------------------------------------------
+  # README
+  # --------------------------------------------------------------------------
+  local project_title
+  project_title="$(printf '%s' "$repo_name" | tr '-' ' ' | awk '{for (i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) tolower(substr($i,2)) } ; print }')"
+
+  local project_description
+  project_description=$(gum input --placeholder "Enter a short project description") || {
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+    return 0
+  }
+
+  if [ -z "$project_description" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: No project description provided."
+    return 1
+  fi
+
+  printf '# %s\n\n%s\n' "$project_title" "$project_description" > "$target_dir/README.md"
+
+  if ! gum spin --spinner dot --title "Creating README commit..." -- \
+    bash -c "git -C \"$target_dir\" add README.md && git -C \"$target_dir\" commit -m 'docs: add README' -m 'Add project title and description scaffold.'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: README commit failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
   # License creation (gh-license extension)
   # --------------------------------------------------------------------------
   if ! gh license --help >/dev/null 2>&1; then
