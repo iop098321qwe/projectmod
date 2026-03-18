@@ -124,6 +124,25 @@ mkmod() {
   printf '#!/usr/bin/env bash\n' > "$target_dir/cbc-module.sh"
 
   # --------------------------------------------------------------------------
+  # README
+  # --------------------------------------------------------------------------
+  local project_title
+  project_title="$(printf '%s' "$repo_name" | tr '-' ' ' | awk '{for (i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) tolower(substr($i,2)) } ; print }')"
+
+  local project_description
+  project_description=$(gum input --placeholder "Enter a short project description") || {
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+    return 0
+  }
+
+  if [ -z "$project_description" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: No project description provided."
+    return 1
+  fi
+
+  printf '# %s\n\n%s\n' "$project_title" "$project_description" > "$target_dir/README.md"
+
+  # --------------------------------------------------------------------------
   # Git init with main as default branch
   # --------------------------------------------------------------------------
   if ! gum spin --spinner dot --title "Initializing git repository..." -- \
@@ -136,7 +155,7 @@ mkmod() {
   # Initial commit
   # --------------------------------------------------------------------------
   if ! gum spin --spinner dot --title "Creating initial commit..." -- \
-    bash -c "git -C \"$target_dir\" add cbc-module.sh && git -C \"$target_dir\" commit -m 'initial commit'"; then
+    bash -c "git -C \"$target_dir\" add cbc-module.sh README.md && git -C \"$target_dir\" commit -m 'initial commit'"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
     return 1
   fi
