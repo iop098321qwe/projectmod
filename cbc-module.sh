@@ -124,6 +124,24 @@ mkmod() {
   printf '#!/usr/bin/env bash\n' > "$target_dir/cbc-module.sh"
 
   # --------------------------------------------------------------------------
+  # Git init with main as default branch
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Initializing git repository..." -- \
+    git -C "$target_dir" init -b main; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: git init failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Initial commit
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Creating initial commit..." -- \
+    bash -c "git -C \"$target_dir\" add cbc-module.sh && git -C \"$target_dir\" commit -m 'initial commit'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
   # README
   # --------------------------------------------------------------------------
   local project_title
@@ -142,21 +160,9 @@ mkmod() {
 
   printf '# %s\n\n%s\n' "$project_title" "$project_description" > "$target_dir/README.md"
 
-  # --------------------------------------------------------------------------
-  # Git init with main as default branch
-  # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Initializing git repository..." -- \
-    git -C "$target_dir" init -b main; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: git init failed."
-    return 1
-  fi
-
-  # --------------------------------------------------------------------------
-  # Initial commit
-  # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating initial commit..." -- \
-    bash -c "git -C \"$target_dir\" add cbc-module.sh README.md && git -C \"$target_dir\" commit -m 'initial commit'"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+  if ! gum spin --spinner dot --title "Creating README commit..." -- \
+    bash -c "git -C \"$target_dir\" add README.md && git -C \"$target_dir\" commit -m 'docs: add README' -m 'Add project title and description scaffold.'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: README commit failed."
     return 1
   fi
 
