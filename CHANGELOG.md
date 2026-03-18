@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.4](https://github.com/iop098321qwe/projectmod/compare/v0.0.3...v0.0.4) (2026-03-18)
+
+
+### Features
+
+* **function:** add README prompt to mkmod ([255aa55](https://github.com/iop098321qwe/projectmod/commit/255aa55513e18121d5b5dec9b33e738c3e408f2d))
+* **function:** separate README commit ([1b3887f](https://github.com/iop098321qwe/projectmod/commit/1b3887f7164b78ca72ea2b5aac95c05d77e197f5))
+
 ## [0.0.3](https://github.com/iop098321qwe/projectmod/compare/v0.0.2...v0.0.3) (2026-03-16)
 
 
