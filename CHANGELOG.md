@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.5](https://github.com/iop098321qwe/projectmod/compare/v0.0.4...v0.0.5) (2026-03-19)
+
+
+### Features
+
+* **function:** show relative path in mkmod confirmation ([130e74f](https://github.com/iop098321qwe/projectmod/commit/130e74fffd1b490b57213e58e96bae6b1d56d26c))
+
 ## [0.0.4](https://github.com/iop098321qwe/projectmod/compare/v0.0.3...v0.0.4) (2026-03-18)
 
 
