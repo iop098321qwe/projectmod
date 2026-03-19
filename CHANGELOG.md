@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.6](https://github.com/iop098321qwe/projectmod/compare/v0.0.5...v0.0.6) (2026-03-19)
+
+
+### Features
+
+* **function:** add mkskill bootstrap command ([2be68bc](https://github.com/iop098321qwe/projectmod/commit/2be68bc75c1390de91b9a6f4c2dd1cca5721c1ed))
+
 ## [0.0.5](https://github.com/iop098321qwe/projectmod/compare/v0.0.4...v0.0.5) (2026-03-19)
 
 
