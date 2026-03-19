@@ -5,6 +5,7 @@ Guides setup for repo creation, licensing, and git-flow defaults.
 
 ## Functions
 - `mkmod`: Create a new CBC module with git, GitHub, and scaffolding.
+- `mkskill`: Create a new OpenCode skill with git, GitHub, and scaffolding.
 
 ## Aliases
 - None.
