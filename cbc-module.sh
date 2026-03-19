@@ -253,3 +253,215 @@ mkmod() {
   cd "$target_dir" || return 1
   yazi
 }
+
+################################################################################
+# MKSKILL
+################################################################################
+
+mkskill() {
+  OPTIND=1
+
+  usage() {
+    cbc_style_box "$CATPPUCCIN_MAUVE" "Description:" \
+      "  Bootstrap a new OpenCode skill with git, git-flow, and GitHub."
+
+    cbc_style_box "$CATPPUCCIN_BLUE" "Usage:" \
+      "  mkskill [-h] [skill-name]"
+
+    cbc_style_box "$CATPPUCCIN_TEAL" "Options:" \
+      "  -h    Display this help message"
+
+    cbc_style_box "$CATPPUCCIN_LAVENDER" "Arguments:" \
+      "  skill-name    Name of the skill to create (prompted if omitted)"
+
+    cbc_style_box "$CATPPUCCIN_PEACH" "Examples:" \
+      "  mkskill" \
+      "  mkskill my-skill"
+  }
+
+  while getopts ":h" opt; do
+    case ${opt} in
+    h)
+      usage
+      return 0
+      ;;
+    \?)
+      cbc_style_message "$CATPPUCCIN_RED" "Invalid option: -$OPTARG"
+      usage
+      return 1
+      ;;
+    esac
+  done
+
+  shift $((OPTIND - 1))
+
+  # --------------------------------------------------------------------------
+  # Preflight: required tools
+  # --------------------------------------------------------------------------
+  local cmd
+  for cmd in gum git gh yazi; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: missing required command: $cmd"
+      return 1
+    fi
+  done
+
+  if ! git flow version >/dev/null 2>&1; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: git-flow is not installed."
+    return 1
+  fi
+
+  if ! gh auth status >/dev/null 2>&1; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: gh is not authenticated. Run 'gh auth login' first."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Resolve target directory
+  # --------------------------------------------------------------------------
+  local skill_name="$1"
+
+  if [ -z "$skill_name" ]; then
+    skill_name=$(gum input --placeholder "Enter skill name for the new skill") || {
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+      return 0
+    }
+
+    if [ -z "$skill_name" ]; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: No skill name provided."
+      return 1
+    fi
+  fi
+
+  skill_name="${skill_name%/}"
+
+  local skills_root
+  skills_root="$(realpath -m "$HOME/.config/opencode/skills")"
+
+  local target_dir
+  target_dir="$(realpath -m "$skills_root/$skill_name")"
+
+  if [[ "$target_dir" != "$skills_root/"* ]]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Skill name resolves outside skills directory."
+    return 1
+  fi
+
+  local repo_name
+  repo_name="$(basename "$target_dir")"
+
+  if [ -z "$repo_name" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Could not determine repo name from skill name."
+    return 1
+  fi
+
+  local cwd
+  cwd="$(pwd -P)"
+
+  local display_dir
+  display_dir="$(realpath -m --relative-to="$cwd" "$target_dir")"
+
+  if [ -z "$display_dir" ]; then
+    display_dir="$target_dir"
+  fi
+
+  # --------------------------------------------------------------------------
+  # Confirm before proceeding
+  # --------------------------------------------------------------------------
+  cbc_style_box "$CATPPUCCIN_LAVENDER" "New OpenCode Skill" \
+    "  Directory: $display_dir" \
+    "  Repo name: $repo_name"
+
+  if ! gum confirm "Bootstrap this skill?"; then
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+    return 0
+  fi
+
+  # --------------------------------------------------------------------------
+  # Fail if directory already exists
+  # --------------------------------------------------------------------------
+  if [ -e "$target_dir" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: '$target_dir' already exists."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Create directory and SKILL.md
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Creating skill directory..." -- \
+    mkdir -p "$target_dir"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create directory."
+    return 1
+  fi
+
+  printf '' > "$target_dir/SKILL.md"
+
+  # --------------------------------------------------------------------------
+  # Git init with main as default branch
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Initializing git repository..." -- \
+    git -C "$target_dir" init -b main; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: git init failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Initial commit
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Creating initial commit..." -- \
+    bash -c "git -C \"$target_dir\" add SKILL.md && git -C \"$target_dir\" commit -m 'initial commit'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Git flow init with defaults
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Initializing git-flow..." -- \
+    git -C "$target_dir" flow init -d; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: git-flow init failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Create GitHub repo (public) and set remote
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Creating GitHub repository..." -- \
+    gh repo create "$repo_name" --public --source="$target_dir" --remote=origin; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: GitHub repo creation failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Push main and develop to remote
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Pushing main to remote..." -- \
+    git -C "$target_dir" push -u origin main; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push main branch."
+    return 1
+  fi
+
+  if ! gum spin --spinner dot --title "Pushing develop to remote..." -- \
+    git -C "$target_dir" push -u origin develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push develop branch."
+    return 1
+  fi
+
+  if ! gum spin --spinner dot --title "Switching to develop branch..." -- \
+    git -C "$target_dir" checkout develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to switch to develop branch."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Success
+  # --------------------------------------------------------------------------
+  local repo_url
+  repo_url="$(gh repo view "$repo_name" --json url -q .url 2>/dev/null)"
+
+  cbc_style_box "$CATPPUCCIN_GREEN" "Skill created successfully!" \
+    "  Path: $target_dir" \
+    "  Repo: ${repo_url:-$repo_name}"
+
+  cd "$target_dir" || return 1
+  yazi
+}
