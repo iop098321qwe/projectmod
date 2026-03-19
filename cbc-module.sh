@@ -92,11 +92,21 @@ mkmod() {
     return 1
   fi
 
+  local cwd
+  cwd="$(pwd -P)"
+
+  local display_dir
+  display_dir="$(realpath -m --relative-to="$cwd" "$target_dir")"
+
+  if [ -z "$display_dir" ]; then
+    display_dir="$target_dir"
+  fi
+
   # --------------------------------------------------------------------------
   # Confirm before proceeding
   # --------------------------------------------------------------------------
   cbc_style_box "$CATPPUCCIN_LAVENDER" "New CBC Module" \
-    "  Directory: $target_dir" \
+    "  Directory: $display_dir" \
     "  Repo name: $repo_name"
 
   if ! gum confirm "Bootstrap this module?"; then
