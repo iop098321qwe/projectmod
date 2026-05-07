@@ -1,6 +1,188 @@
 #!/usr/bin/env bash
 
 ################################################################################
+# AGENTS HELPERS
+################################################################################
+
+cbc_agents_file_purpose() {
+  case "$1" in
+  AGENTS.md)
+    printf '%s' "AI coding agent instructions for this repository."
+    ;;
+  LICENSE)
+    printf '%s' "Project license text."
+    ;;
+  README.md)
+    printf '%s' "Primary repository overview and setup notes."
+    ;;
+  cbc-module.sh)
+    printf '%s' "CBC module entrypoint and shell workflow functions."
+    ;;
+  *)
+    printf '%s' "Verification needed: document this tracked file after review."
+    ;;
+  esac
+}
+
+cbc_write_agents_md() {
+  local target_dir="$1"
+  local repo_name="$2"
+  local tracked_files
+
+  tracked_files="$(
+    {
+      git -C "$target_dir" ls-files
+      printf '%s\n' 'AGENTS.md'
+    } | sort -u
+  )"
+
+  {
+    cat <<EOF
+# AGENTS.md
+
+## Purpose
+
+This file guides AI coding agents working in \`$repo_name\`.
+All work must follow best practices and industry standards where
+applicable.
+
+## Scope
+
+This file covers repository-wide expectations for code, docs, and git
+work.
+It does not replace verified instructions in source files, tooling
+configs,
+or release automation.
+
+## Formatting Rules
+
+- Keep lines at 80 characters or fewer when practical.
+- Allow longer lines only for URLs, code blocks, hashes, or commands
+  that cannot be wrapped cleanly.
+
+## Quick Start
+
+- Read \`README.md\` first for project context and setup notes.
+- Run \`git status --short --branch\` before editing to confirm repo
+  state.
+- Run \`git diff --stat\` before committing to review the change scope.
+- Verification needed: add authoritative setup, run, or build
+  commands when this repository defines them.
+
+## Environment
+
+- Git is required for day-to-day work in this repository.
+- Verification needed: document runtime versions, package managers,
+  and env vars when they exist.
+
+## Repository Overview
+
+- Root files hold the initial project overview, license, and repo
+  policies.
+- Verification needed: add top-level directories here when the repo
+  grows.
+
+## Tracked Files Overview
+
+EOF
+
+    while IFS= read -r tracked_file; do
+      [ -n "$tracked_file" ] || continue
+      printf -- '- `%s`: %s\n' "$tracked_file" \
+        "$(cbc_agents_file_purpose "$tracked_file")"
+    done <<< "$tracked_files"
+
+    cat <<'EOF'
+
+## Architecture
+
+- This repository starts from a minimal scaffold and may not define
+  subsystems yet.
+- Verification needed: describe components, boundaries, and data flow
+  after they are introduced.
+
+## Commands
+
+- `git status --short --branch`: show the current branch and worktree
+  state.
+- `git diff --stat`: review the size and spread of pending changes.
+- `git log --oneline --decorate -5`: inspect recent commit history.
+- Verification needed: document authoritative build, run, lint, and
+  task commands when the repository defines them.
+
+## Testing
+
+- Verification needed: add test commands and expectations when tests
+  exist.
+- Do not claim coverage, test gates, or suites that are not verified.
+
+## Linting and Formatting
+
+- Verification needed: add formatter and linter commands after they
+  are introduced.
+- Keep changes minimal and consistent with the existing code style.
+
+## CI and Release
+
+- Use Conventional Commits for every commit. Prefer a scope when it
+  adds clarity.
+- Never create, edit, or update `CHANGELOG.md` manually.
+- `CHANGELOG.md` is generated and maintained by release tooling only.
+- If release automation adds or changes generated files, let the
+  tooling own those updates.
+
+## Conventions
+
+- Use small, correct changes that fit the existing project structure.
+- Verify behavior from the actual codebase before documenting or
+  changing it.
+- Keep `AGENTS.md` as instructions, not as a changelog, diary, or work
+  log.
+- Do not add update notes, status logs, or change summaries to
+  `AGENTS.md`.
+
+## Security and Compliance
+
+- Never commit secrets, credentials, tokens, or private keys.
+- Verify new dependencies, automation, and scripts before trusting
+  them.
+
+## Dependencies and Services
+
+- Verification needed: document external services, databases, queues,
+  or storage when they are added.
+- Avoid assuming any third-party service exists until the repo proves
+  it.
+
+## Troubleshooting
+
+- If repo behavior is unclear, inspect tracked files and git history
+  before making assumptions.
+- If a generated or managed file changes unexpectedly, verify which
+  tool owns it before editing.
+
+## Refining Existing AGENTS.md
+
+- Re-check every statement against the repository before keeping it.
+- Remove stale, duplicated, or vague guidance.
+- Replace placeholders with exact commands, paths, and verified
+  workflows.
+- Keep bullets short and easy for AI agents to scan.
+- Preserve this section order when improving the file.
+
+## Maintenance
+
+- After any code, config, or doc change, verify that `AGENTS.md` still
+  matches the repository.
+- When `AGENTS.md` needs an update, make it in a separate `docs`
+  Conventional Commit such as `docs(agents): update repo instructions`.
+- Keep `AGENTS.md` out of mixed code commits whenever possible.
+- Remove stale instructions instead of appending historical notes.
+EOF
+  } > "$target_dir/AGENTS.md"
+}
+
+################################################################################
 # MKMOD
 ################################################################################
 
@@ -198,6 +380,20 @@ mkmod() {
   if ! gum spin --spinner dot --title "Creating GPL-3.0 license..." -- \
     bash -c "cd \"$target_dir\" && gh license create gpl-3.0 && git add LICENSE && git commit -m 'add GPL-3.0 license'"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: License creation failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # AGENTS.md
+  # --------------------------------------------------------------------------
+  if ! cbc_write_agents_md "$target_dir" "$repo_name"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create AGENTS.md."
+    return 1
+  fi
+
+  if ! gum spin --spinner dot --title "Creating AGENTS commit..." -- \
+    bash -c 'git -C "$1" add AGENTS.md && git -C "$1" commit -m "docs(agents): add AGENTS guide" -m "Add AI coding agent instructions and AGENTS maintenance rules."' _ "$target_dir"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: AGENTS commit failed."
     return 1
   fi
 
@@ -443,6 +639,7 @@ mkrepo() {
   fi
 
   local readme_action="create"
+  local agents_action="create"
   local include_existing_files="false"
 
   if [ "$use_current_dir" = "true" ]; then
@@ -470,6 +667,30 @@ mkrepo() {
       esac
     fi
 
+    if [ -f "$target_dir/AGENTS.md" ]; then
+      local agents_choice
+      agents_choice=$(gum choose \
+        "Keep existing AGENTS.md" \
+        "Replace AGENTS.md" \
+        "Cancel") || {
+        cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+        return 0
+      }
+
+      case "$agents_choice" in
+      "Keep existing AGENTS.md")
+        agents_action="keep"
+        ;;
+      "Replace AGENTS.md")
+        agents_action="replace"
+        ;;
+      "Cancel")
+        cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+        return 0
+        ;;
+      esac
+    fi
+
     if [ -e "$target_dir/LICENSE" ]; then
       if ! gum confirm "Replace existing LICENSE with GPL-3.0?"; then
         cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
@@ -477,7 +698,7 @@ mkrepo() {
       fi
     fi
 
-    if [ -n "$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'LICENSE' -print -quit 2>/dev/null)" ]; then
+    if [ -n "$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'LICENSE' ! -name 'AGENTS.md' -print -quit 2>/dev/null)" ]; then
       if gum confirm "Commit existing files in a separate commit?"; then
         include_existing_files="true"
       fi
@@ -531,7 +752,7 @@ mkrepo() {
   # --------------------------------------------------------------------------
   if [ "$include_existing_files" = "true" ]; then
     if ! gum spin --spinner dot --title "Creating existing files commit..." -- \
-      bash -c 'git -C "$1" add --all -- . ":(exclude)README.md" ":(exclude)LICENSE" && if git -C "$1" diff --cached --quiet; then exit 0; fi && git -C "$1" commit -m "chore: add existing project files" -m "Record existing non-bootstrap files before adding generated repository scaffolding."' _ "$target_dir"; then
+      bash -c 'git -C "$1" add --all -- . ":(exclude)README.md" ":(exclude)LICENSE" ":(exclude)AGENTS.md" && if git -C "$1" diff --cached --quiet; then exit 0; fi && git -C "$1" commit -m "chore: add existing project files" -m "Record existing non-bootstrap files before adding generated repository scaffolding."' _ "$target_dir"; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: Existing files commit failed."
       return 1
     fi
@@ -565,6 +786,26 @@ mkrepo() {
   if ! gum spin --spinner dot --title "Creating GPL-3.0 license..." -- \
     bash -c 'if [ -e "$1/LICENSE" ]; then rm -f "$1/LICENSE"; fi && cd "$1" && gh license create gpl-3.0 && git add LICENSE && git commit -m "chore(license): add GPL-3.0 license" -m "Add the project license file before publishing the repository to GitHub."' _ "$target_dir"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: License creation failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # AGENTS.md
+  # --------------------------------------------------------------------------
+  local agents_commit_body="Add AI coding agent instructions and AGENTS maintenance rules."
+
+  if [ "$agents_action" = "keep" ]; then
+    agents_commit_body="Add the existing AGENTS.md file to the initial repository history."
+  else
+    if ! cbc_write_agents_md "$target_dir" "$repo_name"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create AGENTS.md."
+      return 1
+    fi
+  fi
+
+  if ! gum spin --spinner dot --title "Creating AGENTS commit..." -- \
+    bash -c 'git -C "$1" add AGENTS.md && git -C "$1" commit -m "docs(agents): add AGENTS guide" -m "$2"' _ "$target_dir" "$agents_commit_body"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: AGENTS commit failed."
     return 1
   fi
 
