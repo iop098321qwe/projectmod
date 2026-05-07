@@ -518,11 +518,20 @@ mkrepo() {
   fi
 
   # --------------------------------------------------------------------------
+  # Empty initial commit
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Creating empty initial commit..." -- \
+    git -C "$target_dir" commit --allow-empty -m "initial commit"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Empty initial commit failed."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
   # Commit existing files, if requested
   # --------------------------------------------------------------------------
   if [ "$include_existing_files" = "true" ]; then
     if ! gum spin --spinner dot --title "Creating existing files commit..." -- \
-      bash -c 'git -C "$1" add --all -- . ":(exclude)README.md" ":(exclude)LICENSE" && if git -C "$1" diff --cached --quiet; then exit 0; fi && git -C "$1" commit -m "initial commit"' _ "$target_dir"; then
+      bash -c 'git -C "$1" add --all -- . ":(exclude)README.md" ":(exclude)LICENSE" && if git -C "$1" diff --cached --quiet; then exit 0; fi && git -C "$1" commit -m "chore: add existing project files" -m "Record existing non-bootstrap files before adding generated repository scaffolding."' _ "$target_dir"; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: Existing files commit failed."
       return 1
     fi
@@ -554,7 +563,7 @@ mkrepo() {
   # License creation
   # --------------------------------------------------------------------------
   if ! gum spin --spinner dot --title "Creating GPL-3.0 license..." -- \
-    bash -c 'if [ -e "$1/LICENSE" ]; then rm -f "$1/LICENSE"; fi && cd "$1" && gh license create gpl-3.0 && git add LICENSE && git commit -m "add GPL-3.0 license"' _ "$target_dir"; then
+    bash -c 'if [ -e "$1/LICENSE" ]; then rm -f "$1/LICENSE"; fi && cd "$1" && gh license create gpl-3.0 && git add LICENSE && git commit -m "chore: add GPL-3.0 license" -m "Add the project license file before publishing the repository to GitHub."' _ "$target_dir"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: License creation failed."
     return 1
   fi
