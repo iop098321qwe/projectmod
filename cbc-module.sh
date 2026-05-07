@@ -171,7 +171,7 @@ mkmod() {
   printf '# %s\n\n%s\n' "$project_title" "$project_description" > "$target_dir/README.md"
 
   if ! gum spin --spinner dot --title "Creating README commit..." -- \
-    bash -c "git -C \"$target_dir\" add README.md && git -C \"$target_dir\" commit -m 'docs: add README' -m 'Add project title and description scaffold.'"; then
+    bash -c "git -C \"$target_dir\" add README.md && git -C \"$target_dir\" commit -m 'docs(readme): add README' -m 'Add project title and description scaffold.'"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: README commit failed."
     return 1
   fi
@@ -554,7 +554,7 @@ mkrepo() {
   fi
 
   if ! gum spin --spinner dot --title "Creating README commit..." -- \
-    bash -c 'git -C "$1" add README.md && git -C "$1" commit -m "docs: add README" -m "$2"' _ "$target_dir" "$readme_commit_body"; then
+    bash -c 'git -C "$1" add README.md && git -C "$1" commit -m "docs(readme): add README" -m "$2"' _ "$target_dir" "$readme_commit_body"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: README commit failed."
     return 1
   fi
@@ -563,7 +563,7 @@ mkrepo() {
   # License creation
   # --------------------------------------------------------------------------
   if ! gum spin --spinner dot --title "Creating GPL-3.0 license..." -- \
-    bash -c 'if [ -e "$1/LICENSE" ]; then rm -f "$1/LICENSE"; fi && cd "$1" && gh license create gpl-3.0 && git add LICENSE && git commit -m "chore: add GPL-3.0 license" -m "Add the project license file before publishing the repository to GitHub."' _ "$target_dir"; then
+    bash -c 'if [ -e "$1/LICENSE" ]; then rm -f "$1/LICENSE"; fi && cd "$1" && gh license create gpl-3.0 && git add LICENSE && git commit -m "chore(license): add GPL-3.0 license" -m "Add the project license file before publishing the repository to GitHub."' _ "$target_dir"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: License creation failed."
     return 1
   fi
