@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.7](https://github.com/iop098321qwe/projectmod/compare/v0.0.6...v0.0.7) (2026-05-08)
+
+
+### Features
+
+* **function:** add `mkrepo` bootstrap command ([b9d4f37](https://github.com/iop098321qwe/projectmod/commit/b9d4f376b4c961d5f096c88063dcd773eaad7f69))
+* **function:** scaffold AGENTS.md in mkmod and mkrepo ([3a3b6b3](https://github.com/iop098321qwe/projectmod/commit/3a3b6b3e0a0bd6bec56cefb422c1879240609154))
+
 ## [0.0.6](https://github.com/iop098321qwe/projectmod/compare/v0.0.5...v0.0.6) (2026-03-19)
 
 
