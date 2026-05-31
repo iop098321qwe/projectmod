@@ -12,7 +12,7 @@ GitHub. Guides setup for repo creation, licensing, and git-flow defaults.
 - `mkskill`: Create a new OpenCode skill with git, GitHub, and
   scaffolding.
 - `mkcommitlint`: Add Commitlint and Husky commit message validation to
-  the current repository.
+  the current repository with incremental setup commits.
 
 ## Aliases
 - None.
