@@ -182,6 +182,49 @@ EOF
   } > "$target_dir/AGENTS.md"
 }
 
+cbc_align_scaffold_branches() {
+  local target_dir="$1"
+  local remote_name=""
+
+  if ! git -C "$target_dir" show-ref --verify --quiet refs/heads/develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: develop branch does not exist."
+    return 1
+  fi
+
+  if ! gum spin --spinner dot --title "Aligning main with develop..." -- \
+    git -C "$target_dir" branch -f main develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to align main with develop."
+    return 1
+  fi
+
+  if ! gum spin --spinner dot --title "Switching to develop branch..." -- \
+    git -C "$target_dir" checkout develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to switch to develop branch."
+    return 1
+  fi
+
+  if git -C "$target_dir" remote get-url origin >/dev/null 2>&1; then
+    remote_name="origin"
+  else
+    local remote_candidate
+
+    while IFS= read -r remote_candidate; do
+      remote_name="$remote_candidate"
+      break
+    done < <(git -C "$target_dir" remote)
+  fi
+
+  if [ -z "$remote_name" ]; then
+    return 0
+  fi
+
+  if ! gum spin --spinner dot --title "Pushing aligned branches to remote..." -- \
+    git -C "$target_dir" push -u "$remote_name" main develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push aligned branches."
+    return 1
+  fi
+}
+
 ################################################################################
 # MKMOD
 ################################################################################
@@ -325,11 +368,11 @@ mkmod() {
   fi
 
   # --------------------------------------------------------------------------
-  # Initial commit
+  # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating initial commit..." -- \
-    bash -c "git -C \"$target_dir\" add cbc-module.sh && git -C \"$target_dir\" commit -m 'initial commit'"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
+    bash -c "git -C \"$target_dir\" add cbc-module.sh && git -C \"$target_dir\" commit -m 'chore: initial commit'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
     return 1
   fi
 
@@ -436,6 +479,17 @@ mkmod() {
     return 1
   fi
 
+  if gum confirm "Initialize commitlint in this module?"; then
+    if ! (cd "$target_dir" && mkcommitlint); then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint initialization failed."
+      return 1
+    fi
+
+    if ! cbc_align_scaffold_branches "$target_dir"; then
+      return 1
+    fi
+  fi
+
   # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
@@ -459,7 +513,7 @@ mkrepo() {
 
   usage() {
     cbc_style_box "$CATPPUCCIN_MAUVE" "Description:" \
-      "  Bootstrap a new repository with git, git-flow, and GitHub."
+      "  Bootstrap a new repository with git, git-flow, and optional GitHub."
 
     cbc_style_box "$CATPPUCCIN_BLUE" "Usage:" \
       "  mkrepo [-h] [directory]"
@@ -495,7 +549,7 @@ mkrepo() {
   # Preflight: required tools
   # --------------------------------------------------------------------------
   local cmd
-  for cmd in gum git gh yazi; do
+  for cmd in gum git yazi; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: missing required command: $cmd"
       return 1
@@ -505,27 +559,6 @@ mkrepo() {
   if ! git flow version >/dev/null 2>&1; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: git-flow is not installed."
     return 1
-  fi
-
-  if ! gh auth status >/dev/null 2>&1; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: gh is not authenticated. Run 'gh auth login' first."
-    return 1
-  fi
-
-  if ! gh license --help >/dev/null 2>&1; then
-    cbc_style_message "$CATPPUCCIN_YELLOW" "gh license extension not found."
-    cbc_style_message "$CATPPUCCIN_YELLOW" "Install with: gh extension install Shresht7/gh-license"
-
-    if ! gum confirm "Install gh-license extension now?"; then
-      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled. GPL-3.0 license creation is required."
-      return 0
-    fi
-
-    if ! gum spin --spinner dot --title "Installing gh-license extension..." -- \
-      gh extension install Shresht7/gh-license; then
-      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install gh-license extension."
-      return 1
-    fi
   fi
 
   # --------------------------------------------------------------------------
@@ -625,17 +658,54 @@ mkrepo() {
     return 1
   fi
 
-  local repo_visibility
-  repo_visibility=$(gum choose "public" "private") || {
+  local repo_mode
+  repo_mode=$(gum choose "Publish on GitHub" "Local only") || {
     cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
     return 0
   }
 
+  local publish_github="false"
+  local repo_visibility=""
   local gh_visibility_flag
   gh_visibility_flag="--public"
 
-  if [ "$repo_visibility" = "private" ]; then
-    gh_visibility_flag="--private"
+  if [ "$repo_mode" = "Publish on GitHub" ]; then
+    publish_github="true"
+
+    if ! command -v gh >/dev/null 2>&1; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: missing required command: gh"
+      return 1
+    fi
+
+    if ! gh auth status >/dev/null 2>&1; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: gh is not authenticated. Run 'gh auth login' first."
+      return 1
+    fi
+
+    if ! gh license --help >/dev/null 2>&1; then
+      cbc_style_message "$CATPPUCCIN_YELLOW" "gh license extension not found."
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Install with: gh extension install Shresht7/gh-license"
+
+      if ! gum confirm "Install gh-license extension now?"; then
+        cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled. GPL-3.0 license creation is required."
+        return 0
+      fi
+
+      if ! gum spin --spinner dot --title "Installing gh-license extension..." -- \
+        gh extension install Shresht7/gh-license; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install gh-license extension."
+        return 1
+      fi
+    fi
+
+    repo_visibility=$(gum choose "public" "private") || {
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+      return 0
+    }
+
+    if [ "$repo_visibility" = "private" ]; then
+      gh_visibility_flag="--private"
+    fi
   fi
 
   local readme_action="create"
@@ -691,14 +761,22 @@ mkrepo() {
       esac
     fi
 
-    if [ -e "$target_dir/LICENSE" ]; then
+    if [ "$publish_github" = "true" ] && [ -e "$target_dir/LICENSE" ]; then
       if ! gum confirm "Replace existing LICENSE with GPL-3.0?"; then
         cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
         return 0
       fi
     fi
 
-    if [ -n "$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'LICENSE' ! -name 'AGENTS.md' -print -quit 2>/dev/null)" ]; then
+    local existing_file
+
+    if [ "$publish_github" = "true" ]; then
+      existing_file="$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'LICENSE' ! -name 'AGENTS.md' -print -quit 2>/dev/null)"
+    else
+      existing_file="$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'AGENTS.md' -print -quit 2>/dev/null)"
+    fi
+
+    if [ -n "$existing_file" ]; then
       if gum confirm "Commit existing files in a separate commit?"; then
         include_existing_files="true"
       fi
@@ -708,10 +786,18 @@ mkrepo() {
   # --------------------------------------------------------------------------
   # Confirm before proceeding
   # --------------------------------------------------------------------------
-  cbc_style_box "$CATPPUCCIN_LAVENDER" "New Repository" \
-    "  Directory: $display_dir" \
-    "  Repo name: $repo_name" \
-    "  Visibility: $repo_visibility"
+  if [ "$publish_github" = "true" ]; then
+    cbc_style_box "$CATPPUCCIN_LAVENDER" "New Repository" \
+      "  Directory: $display_dir" \
+      "  Repo name: $repo_name" \
+      "  Mode: GitHub" \
+      "  Visibility: $repo_visibility"
+  else
+    cbc_style_box "$CATPPUCCIN_LAVENDER" "New Repository" \
+      "  Directory: $display_dir" \
+      "  Repo name: $repo_name" \
+      "  Mode: Local only"
+  fi
 
   if ! gum confirm "Bootstrap this repository?"; then
     cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
@@ -739,11 +825,11 @@ mkrepo() {
   fi
 
   # --------------------------------------------------------------------------
-  # Empty initial commit
+  # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating empty initial commit..." -- \
-    git -C "$target_dir" commit --allow-empty -m "initial commit"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Empty initial commit failed."
+  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
+    git -C "$target_dir" commit --allow-empty -m "chore: initial commit"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
     return 1
   fi
 
@@ -752,7 +838,22 @@ mkrepo() {
   # --------------------------------------------------------------------------
   if [ "$include_existing_files" = "true" ]; then
     if ! gum spin --spinner dot --title "Creating existing files commit..." -- \
-      bash -c 'git -C "$1" add --all -- . ":(exclude)README.md" ":(exclude)LICENSE" ":(exclude)AGENTS.md" && if git -C "$1" diff --cached --quiet; then exit 0; fi && git -C "$1" commit -m "chore: add existing project files" -m "Record existing non-bootstrap files before adding generated repository scaffolding."' _ "$target_dir"; then
+      bash -c '
+        if [ "$2" = "true" ]; then
+          git -C "$1" add --all -- . ":(exclude)README.md" \
+            ":(exclude)LICENSE" ":(exclude)AGENTS.md"
+        else
+          git -C "$1" add --all -- . ":(exclude)README.md" \
+            ":(exclude)AGENTS.md"
+        fi
+
+        if git -C "$1" diff --cached --quiet; then
+          exit 0
+        fi
+
+        git -C "$1" commit -m "chore: add existing project files" \
+          -m "Record existing non-bootstrap files before adding generated repository scaffolding."
+      ' _ "$target_dir" "$publish_github"; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: Existing files commit failed."
       return 1
     fi
@@ -783,10 +884,12 @@ mkrepo() {
   # --------------------------------------------------------------------------
   # License creation
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating GPL-3.0 license..." -- \
-    bash -c 'if [ -e "$1/LICENSE" ]; then rm -f "$1/LICENSE"; fi && cd "$1" && gh license create gpl-3.0 && git add LICENSE && git commit -m "chore(license): add GPL-3.0 license" -m "Add the project license file before publishing the repository to GitHub."' _ "$target_dir"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: License creation failed."
-    return 1
+  if [ "$publish_github" = "true" ]; then
+    if ! gum spin --spinner dot --title "Creating GPL-3.0 license..." -- \
+      bash -c 'if [ -e "$1/LICENSE" ]; then rm -f "$1/LICENSE"; fi && cd "$1" && gh license create gpl-3.0 && git add LICENSE && git commit -m "chore(license): add GPL-3.0 license" -m "Add the project license file before publishing the repository to GitHub."' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: License creation failed."
+      return 1
+    fi
   fi
 
   # --------------------------------------------------------------------------
@@ -821,25 +924,27 @@ mkrepo() {
   # --------------------------------------------------------------------------
   # Create GitHub repo and set remote
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating GitHub repository..." -- \
-    gh repo create "$repo_name" "$gh_visibility_flag" --description "$project_description" --source="$target_dir" --remote=origin; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: GitHub repo creation failed."
-    return 1
-  fi
+  if [ "$publish_github" = "true" ]; then
+    if ! gum spin --spinner dot --title "Creating GitHub repository..." -- \
+      gh repo create "$repo_name" "$gh_visibility_flag" --description "$project_description" --source="$target_dir" --remote=origin; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: GitHub repo creation failed."
+      return 1
+    fi
 
-  # --------------------------------------------------------------------------
-  # Push main and develop to remote
-  # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Pushing main to remote..." -- \
-    git -C "$target_dir" push -u origin main; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push main branch."
-    return 1
-  fi
+    # ------------------------------------------------------------------------
+    # Push main and develop to remote
+    # ------------------------------------------------------------------------
+    if ! gum spin --spinner dot --title "Pushing main to remote..." -- \
+      git -C "$target_dir" push -u origin main; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push main branch."
+      return 1
+    fi
 
-  if ! gum spin --spinner dot --title "Pushing develop to remote..." -- \
-    git -C "$target_dir" push -u origin develop; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push develop branch."
-    return 1
+    if ! gum spin --spinner dot --title "Pushing develop to remote..." -- \
+      git -C "$target_dir" push -u origin develop; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push develop branch."
+      return 1
+    fi
   fi
 
   if ! gum spin --spinner dot --title "Switching to develop branch..." -- \
@@ -848,15 +953,33 @@ mkrepo() {
     return 1
   fi
 
+  if gum confirm "Initialize commitlint in this repository?"; then
+    if ! (cd "$target_dir" && mkcommitlint); then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint initialization failed."
+      return 1
+    fi
+
+    if ! cbc_align_scaffold_branches "$target_dir"; then
+      return 1
+    fi
+  fi
+
   # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
-  local repo_url
-  repo_url="$(gh repo view "$repo_name" --json url -q .url 2>/dev/null)"
+  if [ "$publish_github" = "true" ]; then
+    local repo_url
+    repo_url="$(gh repo view "$repo_name" --json url -q .url 2>/dev/null)"
 
-  cbc_style_box "$CATPPUCCIN_GREEN" "Repository created successfully!" \
-    "  Path: $target_dir" \
-    "  Repo: ${repo_url:-$repo_name}"
+    cbc_style_box "$CATPPUCCIN_GREEN" "Repository created successfully!" \
+      "  Path: $target_dir" \
+      "  Mode: GitHub" \
+      "  Repo: ${repo_url:-$repo_name}"
+  else
+    cbc_style_box "$CATPPUCCIN_GREEN" "Repository created successfully!" \
+      "  Path: $target_dir" \
+      "  Mode: Local only"
+  fi
 
   cd "$target_dir" || return 1
   yazi
@@ -1013,11 +1136,11 @@ mkskill() {
   fi
 
   # --------------------------------------------------------------------------
-  # Initial commit
+  # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating initial commit..." -- \
-    bash -c "git -C \"$target_dir\" add SKILL.md && git -C \"$target_dir\" commit -m 'initial commit'"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
+    bash -c "git -C \"$target_dir\" add SKILL.md && git -C \"$target_dir\" commit -m 'chore: initial commit'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
     return 1
   fi
 
@@ -1168,6 +1291,41 @@ mkcommitlint() {
     has_commits="true"
   fi
 
+  local current_branch
+  current_branch="$(git -C "$target_dir" branch --show-current)" || {
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Could not determine current branch."
+    return 1
+  }
+
+  if [ -z "$current_branch" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: mkcommitlint cannot run from a detached HEAD."
+    return 1
+  fi
+
+  local remote_name=""
+  local configured_remote
+  configured_remote="$(git -C "$target_dir" config "branch.$current_branch.remote" 2>/dev/null || true)"
+
+  if [ -n "$configured_remote" ] && \
+    git -C "$target_dir" remote get-url "$configured_remote" >/dev/null 2>&1; then
+    remote_name="$configured_remote"
+  elif git -C "$target_dir" remote get-url origin >/dev/null 2>&1; then
+    remote_name="origin"
+  else
+    local remote_candidate
+
+    while IFS= read -r remote_candidate; do
+      remote_name="$remote_candidate"
+      break
+    done < <(git -C "$target_dir" remote)
+  fi
+
+  local push_action="skip; no remote configured"
+
+  if [ -n "$remote_name" ]; then
+    push_action="push $current_branch to $remote_name"
+  fi
+
   # --------------------------------------------------------------------------
   # Resolve package manager
   # --------------------------------------------------------------------------
@@ -1283,7 +1441,9 @@ mkcommitlint() {
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Commitlint Bootstrap" \
     "  Repository: $repo_name" \
     "  Path: $display_dir" \
-    "  Initial commit: $initial_commit_action" \
+    "  Branch: $current_branch" \
+    "  Baseline commit: $initial_commit_action" \
+    "  Remote push: $push_action" \
     "  Package manager: $package_manager ($package_manager_source)" \
     "  Package file: $package_action" \
     "  Commitlint config: $config_action" \
@@ -1321,14 +1481,14 @@ mkcommitlint() {
   }
 
   # --------------------------------------------------------------------------
-  # Initial commit
+  # chore: initial commit
   # --------------------------------------------------------------------------
   if [ "$has_commits" != "true" ]; then
-    if ! gum spin --spinner dot --title "Creating initial commit..." -- \
+    if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
       git -C "$target_dir" commit --allow-empty \
         -m "chore: initial commit" \
         -m "Create a clean repository baseline before adding commitlint automation."; then
-      cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+      cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
       return 1
     fi
   fi
@@ -1577,8 +1737,18 @@ mkcommitlint() {
 
   rm -f "$message_file"
 
+  if [ -n "$remote_name" ]; then
+    if ! gum spin --spinner dot --title "Pushing $current_branch to remote..." -- \
+      git -C "$target_dir" push -u "$remote_name" "$current_branch"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push $current_branch branch."
+      return 1
+    fi
+  fi
+
   cbc_style_box "$CATPPUCCIN_GREEN" "Commitlint bootstrapped successfully!" \
     "  Path: $target_dir" \
+    "  Branch: $current_branch" \
+    "  Remote: ${remote_name:-none}" \
     "  Config: ${commitlint_config:-commitlint.config.cjs}" \
     "  Hook: .husky/commit-msg"
 }
