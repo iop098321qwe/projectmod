@@ -1073,3 +1073,416 @@ mkskill() {
   cd "$target_dir" || return 1
   yazi
 }
+
+################################################################################
+# MKCOMMITLINT
+################################################################################
+
+mkcommitlint() {
+  OPTIND=1
+
+  usage() {
+    cbc_style_box "$CATPPUCCIN_MAUVE" "Description:" \
+      "  Bootstrap Commitlint and Husky in the current git repository."
+
+    cbc_style_box "$CATPPUCCIN_BLUE" "Usage:" \
+      "  mkcommitlint [-h]"
+
+    cbc_style_box "$CATPPUCCIN_TEAL" "Options:" \
+      "  -h    Display this help message"
+
+    cbc_style_box "$CATPPUCCIN_PEACH" "Examples:" \
+      "  mkcommitlint"
+  }
+
+  while getopts ":h" opt; do
+    case ${opt} in
+    h)
+      usage
+      return 0
+      ;;
+    \?)
+      cbc_style_message "$CATPPUCCIN_RED" "Invalid option: -$OPTARG"
+      usage
+      return 1
+      ;;
+    esac
+  done
+
+  shift $((OPTIND - 1))
+
+  if [ "$#" -gt 0 ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: mkcommitlint does not accept arguments."
+    usage
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Preflight: required tools
+  # --------------------------------------------------------------------------
+  local cmd
+  for cmd in gum git node; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: missing required command: $cmd"
+      return 1
+    fi
+  done
+
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: mkcommitlint must run inside a git repository."
+    return 1
+  fi
+
+  local target_dir
+  target_dir="$(git rev-parse --show-toplevel)" || {
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Could not resolve git repository root."
+    return 1
+  }
+
+  local repo_name
+  repo_name="$(basename "$target_dir")"
+
+  if [ -z "$repo_name" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Could not determine repo name from path."
+    return 1
+  fi
+
+  local cwd
+  cwd="$(pwd -P)"
+
+  local display_dir
+  display_dir="$(realpath -m --relative-to="$cwd" "$target_dir")"
+
+  if [ -z "$display_dir" ]; then
+    display_dir="$target_dir"
+  fi
+
+  if [ -n "$(git -C "$target_dir" status --porcelain)" ]; then
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Warning: repository has uncommitted changes."
+
+    if ! gum confirm "Continue and add commitlint changes to this worktree?"; then
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+      return 0
+    fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # Resolve package manager
+  # --------------------------------------------------------------------------
+  local package_json="$target_dir/package.json"
+  local package_manager=""
+  local package_manager_source="default"
+  local create_package_json="false"
+
+  if [ -f "$package_json" ]; then
+    local declared_package_manager
+    declared_package_manager="$(node -e 'const fs = require("fs"); const file = process.argv[1]; const pkg = JSON.parse(fs.readFileSync(file, "utf8")); const value = String(pkg.packageManager || ""); if (value) process.stdout.write(value.split("@")[0]);' "$package_json")" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: package.json is not valid JSON."
+      return 1
+    }
+
+    case "$declared_package_manager" in
+    npm | pnpm | yarn | bun)
+      package_manager="$declared_package_manager"
+      package_manager_source="package.json packageManager"
+      ;;
+    "")
+      ;;
+    *)
+      cbc_style_message "$CATPPUCCIN_RED" "Error: unsupported package manager: $declared_package_manager"
+      return 1
+      ;;
+    esac
+  else
+    create_package_json="true"
+  fi
+
+  if [ -z "$package_manager" ]; then
+    if [ -f "$target_dir/pnpm-lock.yaml" ]; then
+      package_manager="pnpm"
+      package_manager_source="pnpm-lock.yaml"
+    elif [ -f "$target_dir/yarn.lock" ]; then
+      package_manager="yarn"
+      package_manager_source="yarn.lock"
+    elif [ -f "$target_dir/bun.lock" ] || [ -f "$target_dir/bun.lockb" ]; then
+      package_manager="bun"
+      package_manager_source="bun lockfile"
+    elif [ -f "$target_dir/package-lock.json" ] || [ -f "$target_dir/npm-shrinkwrap.json" ]; then
+      package_manager="npm"
+      package_manager_source="npm lockfile"
+    else
+      package_manager="npm"
+      package_manager_source="default"
+    fi
+  fi
+
+  if ! command -v "$package_manager" >/dev/null 2>&1; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: missing required package manager: $package_manager"
+    return 1
+  fi
+
+  if [ "$create_package_json" = "true" ] && ! command -v npm >/dev/null 2>&1; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: npm is required to create package.json."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Detect existing config and hook state
+  # --------------------------------------------------------------------------
+  local commitlint_config=""
+  local config_candidate
+
+  for config_candidate in \
+    commitlint.config.js \
+    commitlint.config.cjs \
+    commitlint.config.mjs \
+    .commitlintrc \
+    .commitlintrc.json \
+    .commitlintrc.yaml \
+    .commitlintrc.yml \
+    .commitlintrc.js \
+    .commitlintrc.cjs \
+    .commitlintrc.mjs; do
+    if [ -f "$target_dir/$config_candidate" ]; then
+      commitlint_config="$config_candidate"
+      break
+    fi
+  done
+
+  local config_action="create commitlint.config.cjs"
+
+  if [ -n "$commitlint_config" ]; then
+    config_action="keep $commitlint_config"
+  fi
+
+  local hook_file="$target_dir/.husky/commit-msg"
+  local hook_action="create .husky/commit-msg"
+
+  if [ -f "$hook_file" ]; then
+    if grep -q "commitlint" "$hook_file"; then
+      hook_action="keep existing commit-msg hook"
+    else
+      hook_action="append to existing commit-msg hook"
+    fi
+  fi
+
+  local package_action="use existing package.json"
+
+  if [ "$create_package_json" = "true" ]; then
+    package_action="create package.json"
+  fi
+
+  cbc_style_box "$CATPPUCCIN_LAVENDER" "Commitlint Bootstrap" \
+    "  Repository: $repo_name" \
+    "  Path: $display_dir" \
+    "  Package manager: $package_manager ($package_manager_source)" \
+    "  Package file: $package_action" \
+    "  Commitlint config: $config_action" \
+    "  Husky hook: $hook_action"
+
+  if ! gum confirm "Bootstrap commitlint in this repository?"; then
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+    return 0
+  fi
+
+  # --------------------------------------------------------------------------
+  # package.json
+  # --------------------------------------------------------------------------
+  if [ "$create_package_json" = "true" ]; then
+    if ! gum spin --spinner dot --title "Creating package.json..." -- \
+      bash -c 'cd "$1" && npm init -y' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create package.json."
+      return 1
+    fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # Dependencies
+  # --------------------------------------------------------------------------
+  case "$package_manager" in
+  npm)
+    if ! gum spin --spinner dot --title "Installing commitlint tooling..." -- \
+      bash -c 'cd "$1" && npm install --save-dev @commitlint/cli @commitlint/config-conventional husky' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install commitlint tooling."
+      return 1
+    fi
+    ;;
+  pnpm)
+    if ! gum spin --spinner dot --title "Installing commitlint tooling..." -- \
+      bash -c 'cd "$1" && pnpm add --save-dev @commitlint/cli @commitlint/config-conventional husky' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install commitlint tooling."
+      return 1
+    fi
+    ;;
+  yarn)
+    if ! gum spin --spinner dot --title "Installing commitlint tooling..." -- \
+      bash -c 'cd "$1" && yarn add --dev @commitlint/cli @commitlint/config-conventional husky' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install commitlint tooling."
+      return 1
+    fi
+    ;;
+  bun)
+    if ! gum spin --spinner dot --title "Installing commitlint tooling..." -- \
+      bash -c 'cd "$1" && bun add --dev @commitlint/cli @commitlint/config-conventional husky' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install commitlint tooling."
+      return 1
+    fi
+    ;;
+  esac
+
+  # --------------------------------------------------------------------------
+  # Ignore installed dependencies
+  # --------------------------------------------------------------------------
+  local gitignore_file="$target_dir/.gitignore"
+
+  if [ -f "$gitignore_file" ]; then
+    if ! grep -Eq '^[[:space:]]*/?node_modules/?[[:space:]]*$' "$gitignore_file"; then
+      {
+        printf '\n'
+        printf '%s\n' 'node_modules/'
+      } >> "$gitignore_file"
+    fi
+  else
+    printf '%s\n' 'node_modules/' > "$gitignore_file"
+  fi
+
+  # --------------------------------------------------------------------------
+  # package.json scripts
+  # --------------------------------------------------------------------------
+  if ! node -e 'const fs = require("fs"); const file = process.argv[1]; const pkg = JSON.parse(fs.readFileSync(file, "utf8")); pkg.scripts = pkg.scripts || {}; const prepare = String(pkg.scripts.prepare || "").trim(); if (!prepare) { pkg.scripts.prepare = "husky"; } else if (!/\bhusky\b/.test(prepare)) { pkg.scripts.prepare = `${prepare} && husky`; } fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`);' "$package_json"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update package.json prepare script."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Commitlint config
+  # --------------------------------------------------------------------------
+  if [ -z "$commitlint_config" ]; then
+    {
+      printf '%s\n' 'module.exports = {'
+      printf '%s\n' '  extends: ["@commitlint/config-conventional"],'
+      printf '%s\n' '};'
+    } > "$target_dir/commitlint.config.cjs"
+  fi
+
+  # --------------------------------------------------------------------------
+  # Husky setup
+  # --------------------------------------------------------------------------
+  case "$package_manager" in
+  npm)
+    if ! gum spin --spinner dot --title "Initializing Husky..." -- \
+      bash -c 'cd "$1" && ./node_modules/.bin/husky' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Husky initialization failed."
+      return 1
+    fi
+    ;;
+  pnpm)
+    if ! gum spin --spinner dot --title "Initializing Husky..." -- \
+      bash -c 'cd "$1" && pnpm exec husky' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Husky initialization failed."
+      return 1
+    fi
+    ;;
+  yarn)
+    if ! gum spin --spinner dot --title "Initializing Husky..." -- \
+      bash -c 'cd "$1" && yarn husky' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Husky initialization failed."
+      return 1
+    fi
+    ;;
+  bun)
+    if ! gum spin --spinner dot --title "Initializing Husky..." -- \
+      bash -c 'cd "$1" && bun run husky' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Husky initialization failed."
+      return 1
+    fi
+    ;;
+  esac
+
+  mkdir -p "$target_dir/.husky"
+
+  local hook_command
+
+  case "$package_manager" in
+  npm)
+    hook_command='./node_modules/.bin/commitlint --edit "$1"'
+    ;;
+  pnpm)
+    hook_command='pnpm exec commitlint --edit "$1"'
+    ;;
+  yarn)
+    hook_command='yarn commitlint --edit "$1"'
+    ;;
+  bun)
+    hook_command='bun run commitlint --edit "$1"'
+    ;;
+  esac
+
+  if [ ! -f "$hook_file" ]; then
+    {
+      printf '%s\n' '#!/usr/bin/env sh'
+      printf '\n'
+      printf '%s\n' "$hook_command"
+    } > "$hook_file"
+  elif ! grep -q "commitlint" "$hook_file"; then
+    {
+      printf '\n'
+      printf '%s\n' "$hook_command"
+    } >> "$hook_file"
+  fi
+
+  chmod +x "$hook_file"
+
+  # --------------------------------------------------------------------------
+  # Verification
+  # --------------------------------------------------------------------------
+  local message_file
+  message_file="$(mktemp)" || {
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create temporary message file."
+    return 1
+  }
+
+  printf '%s\n' 'chore: verify commitlint setup' > "$message_file"
+
+  case "$package_manager" in
+  npm)
+    if ! gum spin --spinner dot --title "Verifying commitlint..." -- \
+      bash -c 'cd "$1" && ./node_modules/.bin/commitlint --edit "$2"' _ "$target_dir" "$message_file"; then
+      rm -f "$message_file"
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint verification failed."
+      return 1
+    fi
+    ;;
+  pnpm)
+    if ! gum spin --spinner dot --title "Verifying commitlint..." -- \
+      bash -c 'cd "$1" && pnpm exec commitlint --edit "$2"' _ "$target_dir" "$message_file"; then
+      rm -f "$message_file"
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint verification failed."
+      return 1
+    fi
+    ;;
+  yarn)
+    if ! gum spin --spinner dot --title "Verifying commitlint..." -- \
+      bash -c 'cd "$1" && yarn commitlint --edit "$2"' _ "$target_dir" "$message_file"; then
+      rm -f "$message_file"
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint verification failed."
+      return 1
+    fi
+    ;;
+  bun)
+    if ! gum spin --spinner dot --title "Verifying commitlint..." -- \
+      bash -c 'cd "$1" && bun run commitlint --edit "$2"' _ "$target_dir" "$message_file"; then
+      rm -f "$message_file"
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint verification failed."
+      return 1
+    fi
+    ;;
+  esac
+
+  rm -f "$message_file"
+
+  cbc_style_box "$CATPPUCCIN_GREEN" "Commitlint bootstrapped successfully!" \
+    "  Path: $target_dir" \
+    "  Config: ${commitlint_config:-commitlint.config.cjs}" \
+    "  Hook: .husky/commit-msg"
+}
