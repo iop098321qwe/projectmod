@@ -325,11 +325,11 @@ mkmod() {
   fi
 
   # --------------------------------------------------------------------------
-  # Initial commit
+  # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating initial commit..." -- \
-    bash -c "git -C \"$target_dir\" add cbc-module.sh && git -C \"$target_dir\" commit -m 'initial commit'"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
+    bash -c "git -C \"$target_dir\" add cbc-module.sh && git -C \"$target_dir\" commit -m 'chore: initial commit'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
     return 1
   fi
 
@@ -771,11 +771,11 @@ mkrepo() {
   fi
 
   # --------------------------------------------------------------------------
-  # Empty initial commit
+  # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating empty initial commit..." -- \
-    git -C "$target_dir" commit --allow-empty -m "initial commit"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Empty initial commit failed."
+  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
+    git -C "$target_dir" commit --allow-empty -m "chore: initial commit"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
     return 1
   fi
 
@@ -1071,11 +1071,11 @@ mkskill() {
   fi
 
   # --------------------------------------------------------------------------
-  # Initial commit
+  # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating initial commit..." -- \
-    bash -c "git -C \"$target_dir\" add SKILL.md && git -C \"$target_dir\" commit -m 'initial commit'"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
+    bash -c "git -C \"$target_dir\" add SKILL.md && git -C \"$target_dir\" commit -m 'chore: initial commit'"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
     return 1
   fi
 
@@ -1341,7 +1341,7 @@ mkcommitlint() {
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Commitlint Bootstrap" \
     "  Repository: $repo_name" \
     "  Path: $display_dir" \
-    "  Initial commit: $initial_commit_action" \
+    "  Baseline commit: $initial_commit_action" \
     "  Package manager: $package_manager ($package_manager_source)" \
     "  Package file: $package_action" \
     "  Commitlint config: $config_action" \
@@ -1379,14 +1379,14 @@ mkcommitlint() {
   }
 
   # --------------------------------------------------------------------------
-  # Initial commit
+  # chore: initial commit
   # --------------------------------------------------------------------------
   if [ "$has_commits" != "true" ]; then
-    if ! gum spin --spinner dot --title "Creating initial commit..." -- \
+    if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
       git -C "$target_dir" commit --allow-empty \
         -m "chore: initial commit" \
         -m "Create a clean repository baseline before adding commitlint automation."; then
-      cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+      cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
       return 1
     fi
   fi
