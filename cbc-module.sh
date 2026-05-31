@@ -1233,6 +1233,47 @@ mkcommitlint() {
     has_commits="true"
   fi
 
+  local original_branch
+  original_branch="$(git -C "$target_dir" branch --show-current)" || {
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Could not determine current branch."
+    return 1
+  }
+
+  if [ -z "$original_branch" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: mkcommitlint cannot run from a detached HEAD."
+    return 1
+  fi
+
+  local setup_branch="$original_branch"
+  local sync_branch
+
+  case "$setup_branch" in
+  develop)
+    sync_branch="main"
+    ;;
+  main)
+    sync_branch="develop"
+    ;;
+  *)
+    if git -C "$target_dir" show-ref --verify --quiet refs/heads/develop; then
+      setup_branch="develop"
+      sync_branch="main"
+    elif git -C "$target_dir" show-ref --verify --quiet refs/heads/main; then
+      setup_branch="main"
+      sync_branch="develop"
+    else
+      cbc_style_message "$CATPPUCCIN_RED" "Error: mkcommitlint requires a main or develop branch."
+      return 1
+    fi
+
+    if ! gum spin --spinner dot --title "Switching to $setup_branch branch..." -- \
+      git -C "$target_dir" checkout "$setup_branch"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to switch to $setup_branch branch."
+      return 1
+    fi
+    ;;
+  esac
+
   # --------------------------------------------------------------------------
   # Resolve package manager
   # --------------------------------------------------------------------------
@@ -1349,6 +1390,7 @@ mkcommitlint() {
     "  Repository: $repo_name" \
     "  Path: $display_dir" \
     "  Baseline commit: $initial_commit_action" \
+    "  Branches: update $setup_branch and $sync_branch" \
     "  Package manager: $package_manager ($package_manager_source)" \
     "  Package file: $package_action" \
     "  Commitlint config: $config_action" \
@@ -1356,6 +1398,10 @@ mkcommitlint() {
     "  Commits: create incremental Conventional Commits"
 
   if ! gum confirm "Bootstrap commitlint in this repository?"; then
+    if [ "$original_branch" != "$setup_branch" ]; then
+      git -C "$target_dir" checkout "$original_branch" >/dev/null 2>&1
+    fi
+
     cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
     return 0
   fi
@@ -1384,6 +1430,21 @@ mkcommitlint() {
       return 1
     fi
   }
+
+  local sync_branch_exists="false"
+
+  if git -C "$target_dir" show-ref --verify --quiet "refs/heads/$sync_branch"; then
+    sync_branch_exists="true"
+  fi
+
+  local setup_base=""
+
+  if [ "$has_commits" = "true" ]; then
+    setup_base="$(git -C "$target_dir" rev-parse "$setup_branch")" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Could not resolve $setup_branch branch."
+      return 1
+    }
+  fi
 
   # --------------------------------------------------------------------------
   # chore: initial commit
@@ -1642,8 +1703,57 @@ mkcommitlint() {
 
   rm -f "$message_file"
 
+  local setup_head
+  setup_head="$(git -C "$target_dir" rev-parse "$setup_branch")" || {
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Could not resolve $setup_branch branch."
+    return 1
+  }
+
+  local -a setup_commits=()
+  local setup_commit
+
+  if [ -n "$setup_base" ]; then
+    while IFS= read -r setup_commit; do
+      [ -n "$setup_commit" ] || continue
+      setup_commits+=("$setup_commit")
+    done < <(git -C "$target_dir" rev-list --reverse "$setup_base..$setup_head")
+  else
+    while IFS= read -r setup_commit; do
+      [ -n "$setup_commit" ] || continue
+      setup_commits+=("$setup_commit")
+    done < <(git -C "$target_dir" rev-list --reverse "$setup_head")
+  fi
+
+  if [ "$sync_branch_exists" = "true" ] && [ "${#setup_commits[@]}" -gt 0 ]; then
+    if ! gum spin --spinner dot --title "Switching to $sync_branch branch..." -- \
+      git -C "$target_dir" checkout "$sync_branch"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to switch to $sync_branch branch."
+      return 1
+    fi
+
+    if ! gum spin --spinner dot --title "Applying commitlint commits to $sync_branch..." -- \
+      git -C "$target_dir" cherry-pick "${setup_commits[@]}"; then
+      git -C "$target_dir" cherry-pick --abort >/dev/null 2>&1
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to apply commitlint commits to $sync_branch."
+      return 1
+    fi
+  elif [ "$sync_branch_exists" != "true" ]; then
+    if ! gum spin --spinner dot --title "Creating $sync_branch branch..." -- \
+      git -C "$target_dir" branch "$sync_branch" "$setup_head"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create $sync_branch branch."
+      return 1
+    fi
+  fi
+
+  if ! gum spin --spinner dot --title "Switching to develop branch..." -- \
+    git -C "$target_dir" checkout develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to switch to develop branch."
+    return 1
+  fi
+
   cbc_style_box "$CATPPUCCIN_GREEN" "Commitlint bootstrapped successfully!" \
     "  Path: $target_dir" \
+    "  Branches: main, develop" \
     "  Config: ${commitlint_config:-commitlint.config.cjs}" \
     "  Hook: .husky/commit-msg"
 }
