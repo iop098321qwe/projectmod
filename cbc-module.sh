@@ -182,6 +182,49 @@ EOF
   } > "$target_dir/AGENTS.md"
 }
 
+cbc_align_scaffold_branches() {
+  local target_dir="$1"
+  local remote_name=""
+
+  if ! git -C "$target_dir" show-ref --verify --quiet refs/heads/develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: develop branch does not exist."
+    return 1
+  fi
+
+  if ! gum spin --spinner dot --title "Aligning main with develop..." -- \
+    git -C "$target_dir" branch -f main develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to align main with develop."
+    return 1
+  fi
+
+  if ! gum spin --spinner dot --title "Switching to develop branch..." -- \
+    git -C "$target_dir" checkout develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to switch to develop branch."
+    return 1
+  fi
+
+  if git -C "$target_dir" remote get-url origin >/dev/null 2>&1; then
+    remote_name="origin"
+  else
+    local remote_candidate
+
+    while IFS= read -r remote_candidate; do
+      remote_name="$remote_candidate"
+      break
+    done < <(git -C "$target_dir" remote)
+  fi
+
+  if [ -z "$remote_name" ]; then
+    return 0
+  fi
+
+  if ! gum spin --spinner dot --title "Pushing aligned branches to remote..." -- \
+    git -C "$target_dir" push -u "$remote_name" main develop; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push aligned branches."
+    return 1
+  fi
+}
+
 ################################################################################
 # MKMOD
 ################################################################################
@@ -434,6 +477,17 @@ mkmod() {
     git -C "$target_dir" checkout develop; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to switch to develop branch."
     return 1
+  fi
+
+  if gum confirm "Initialize commitlint in this module?"; then
+    if ! (cd "$target_dir" && mkcommitlint); then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint initialization failed."
+      return 1
+    fi
+
+    if ! cbc_align_scaffold_branches "$target_dir"; then
+      return 1
+    fi
   fi
 
   # --------------------------------------------------------------------------
@@ -902,6 +956,10 @@ mkrepo() {
   if gum confirm "Initialize commitlint in this repository?"; then
     if ! (cd "$target_dir" && mkcommitlint); then
       cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint initialization failed."
+      return 1
+    fi
+
+    if ! cbc_align_scaffold_branches "$target_dir"; then
       return 1
     fi
   fi
