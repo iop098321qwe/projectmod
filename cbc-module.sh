@@ -1158,12 +1158,14 @@ mkcommitlint() {
   fi
 
   if [ -n "$(git -C "$target_dir" status --porcelain)" ]; then
-    cbc_style_message "$CATPPUCCIN_YELLOW" "Warning: repository has uncommitted changes."
+    cbc_style_message "$CATPPUCCIN_RED" "Error: mkcommitlint creates commits and requires a clean worktree."
+    return 1
+  fi
 
-    if ! gum confirm "Continue and add commitlint changes to this worktree?"; then
-      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
-      return 0
-    fi
+  local has_commits="false"
+
+  if git -C "$target_dir" rev-parse --verify HEAD >/dev/null 2>&1; then
+    has_commits="true"
   fi
 
   # --------------------------------------------------------------------------
@@ -1272,17 +1274,86 @@ mkcommitlint() {
     package_action="create package.json"
   fi
 
+  local initial_commit_action="skip"
+
+  if [ "$has_commits" != "true" ]; then
+    initial_commit_action="create chore: initial commit"
+  fi
+
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Commitlint Bootstrap" \
     "  Repository: $repo_name" \
     "  Path: $display_dir" \
+    "  Initial commit: $initial_commit_action" \
     "  Package manager: $package_manager ($package_manager_source)" \
     "  Package file: $package_action" \
     "  Commitlint config: $config_action" \
-    "  Husky hook: $hook_action"
+    "  Husky hook: $hook_action" \
+    "  Commits: create incremental Conventional Commits"
 
   if ! gum confirm "Bootstrap commitlint in this repository?"; then
     cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
     return 0
+  fi
+
+  commit_bootstrap_paths() {
+    local subject="$1"
+    local body="$2"
+    local pathspec
+
+    shift 2
+
+    for pathspec in "$@"; do
+      if [ -e "$target_dir/$pathspec" ] || \
+        git -C "$target_dir" ls-files --error-unmatch "$pathspec" >/dev/null 2>&1; then
+        git -C "$target_dir" add -- "$pathspec" || return 1
+      fi
+    done
+
+    if git -C "$target_dir" diff --cached --quiet; then
+      return 0
+    fi
+
+    if ! gum spin --spinner dot --title "Creating commit: $subject" -- \
+      git -C "$target_dir" commit -m "$subject" -m "$body"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create commit: $subject"
+      return 1
+    fi
+  }
+
+  # --------------------------------------------------------------------------
+  # Initial commit
+  # --------------------------------------------------------------------------
+  if [ "$has_commits" != "true" ]; then
+    if ! gum spin --spinner dot --title "Creating initial commit..." -- \
+      git -C "$target_dir" commit --allow-empty \
+        -m "chore: initial commit" \
+        -m "Create a clean repository baseline before adding commitlint automation."; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Initial commit failed."
+      return 1
+    fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # Ignore installed dependencies
+  # --------------------------------------------------------------------------
+  local gitignore_file="$target_dir/.gitignore"
+
+  if [ -f "$gitignore_file" ]; then
+    if ! grep -Eq '^[[:space:]]*/?node_modules/?[[:space:]]*$' "$gitignore_file"; then
+      {
+        printf '\n'
+        printf '%s\n' 'node_modules/'
+      } >> "$gitignore_file"
+    fi
+  else
+    printf '%s\n' 'node_modules/' > "$gitignore_file"
+  fi
+
+  if ! commit_bootstrap_paths \
+    "chore(gitignore): ignore node dependencies" \
+    "Keep installed package dependencies out of repository history." \
+    .gitignore; then
+    return 1
   fi
 
   # --------------------------------------------------------------------------
@@ -1331,26 +1402,29 @@ mkcommitlint() {
   esac
 
   # --------------------------------------------------------------------------
-  # Ignore installed dependencies
+  # Dependency commit
   # --------------------------------------------------------------------------
-  local gitignore_file="$target_dir/.gitignore"
+  local -a package_paths
 
-  if [ -f "$gitignore_file" ]; then
-    if ! grep -Eq '^[[:space:]]*/?node_modules/?[[:space:]]*$' "$gitignore_file"; then
-      {
-        printf '\n'
-        printf '%s\n' 'node_modules/'
-      } >> "$gitignore_file"
-    fi
-  else
-    printf '%s\n' 'node_modules/' > "$gitignore_file"
-  fi
+  case "$package_manager" in
+  npm)
+    package_paths=(package.json package-lock.json npm-shrinkwrap.json)
+    ;;
+  pnpm)
+    package_paths=(package.json pnpm-lock.yaml)
+    ;;
+  yarn)
+    package_paths=(package.json yarn.lock)
+    ;;
+  bun)
+    package_paths=(package.json bun.lock bun.lockb)
+    ;;
+  esac
 
-  # --------------------------------------------------------------------------
-  # package.json scripts
-  # --------------------------------------------------------------------------
-  if ! node -e 'const fs = require("fs"); const file = process.argv[1]; const pkg = JSON.parse(fs.readFileSync(file, "utf8")); pkg.scripts = pkg.scripts || {}; const prepare = String(pkg.scripts.prepare || "").trim(); if (!prepare) { pkg.scripts.prepare = "husky"; } else if (!/\bhusky\b/.test(prepare)) { pkg.scripts.prepare = `${prepare} && husky`; } fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`);' "$package_json"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update package.json prepare script."
+  if ! commit_bootstrap_paths \
+    "build(commitlint): add commitlint dependencies" \
+    "Install Commitlint and Husky as development dependencies." \
+    "${package_paths[@]}"; then
     return 1
   fi
 
@@ -1363,6 +1437,21 @@ mkcommitlint() {
       printf '%s\n' '  extends: ["@commitlint/config-conventional"],'
       printf '%s\n' '};'
     } > "$target_dir/commitlint.config.cjs"
+  fi
+
+  if ! commit_bootstrap_paths \
+    "build(commitlint): add conventional commit rules" \
+    "Configure Commitlint to enforce Conventional Commits." \
+    commitlint.config.cjs; then
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # package.json scripts
+  # --------------------------------------------------------------------------
+  if ! node -e 'const fs = require("fs"); const file = process.argv[1]; const pkg = JSON.parse(fs.readFileSync(file, "utf8")); pkg.scripts = pkg.scripts || {}; const prepare = String(pkg.scripts.prepare || "").trim(); if (!prepare) { pkg.scripts.prepare = "husky"; } else if (!/\bhusky\b/.test(prepare)) { pkg.scripts.prepare = `${prepare} && husky`; } fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`);' "$package_json"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update package.json prepare script."
+    return 1
   fi
 
   # --------------------------------------------------------------------------
@@ -1432,6 +1521,13 @@ mkcommitlint() {
   fi
 
   chmod +x "$hook_file"
+
+  if ! commit_bootstrap_paths \
+    "build(husky): enforce commitlint on commits" \
+    "Run Commitlint from the commit-msg hook for every new commit." \
+    package.json .husky; then
+    return 1
+  fi
 
   # --------------------------------------------------------------------------
   # Verification
