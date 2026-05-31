@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.8](https://github.com/iop098321qwe/projectmod/compare/v0.0.7...v0.0.8) (2026-05-31)
+
+
+### Features
+
+* **function:** add local-only mkrepo option ([1d121e0](https://github.com/iop098321qwe/projectmod/commit/1d121e0b1a465d3685be4bf008ca0730b51ec676))
+* **function:** add mkcommitlint bootstrap command ([ea9f919](https://github.com/iop098321qwe/projectmod/commit/ea9f919c4f690a679fb097bc74dcab90204f360e))
+* **function:** align scaffold branches after commitlint ([5cb0a67](https://github.com/iop098321qwe/projectmod/commit/5cb0a67db6ef10bf4b62e9bf9cd0330eb5ef1d65))
+* **function:** commit mkcommitlint setup incrementally ([755512f](https://github.com/iop098321qwe/projectmod/commit/755512ff8cc2e1771dbb1ddbfe7b20cc41118a98))
+* **function:** mirror commitlint setup branches ([ac4957e](https://github.com/iop098321qwe/projectmod/commit/ac4957e549df1a6a4a43b8bd671d9a63cf65b206))
+* **function:** offer commitlint from mkrepo ([cd9055c](https://github.com/iop098321qwe/projectmod/commit/cd9055c11721086ab69ec2e75bd548e49394cd30))
+* **function:** push commitlint branches remotely ([1b45900](https://github.com/iop098321qwe/projectmod/commit/1b459001d6380019906c947e93ea78ed17701f2a))
+* **function:** push mkcommitlint current branch ([3d74443](https://github.com/iop098321qwe/projectmod/commit/3d74443842c1603255d311aab9e5f8868bbfd015))
+
+
+### Bug Fixes
+
+* **function:** scope mkcommitlint to current branch ([199ee02](https://github.com/iop098321qwe/projectmod/commit/199ee02f1a428d4b46506896a931b97b3aa720df))
+* **function:** use conventional initial commits ([92cb7c2](https://github.com/iop098321qwe/projectmod/commit/92cb7c24cb2346080d3a4c92c938a5089251b002))
+
 ## [0.0.7](https://github.com/iop098321qwe/projectmod/compare/v0.0.6...v0.0.7) (2026-05-08)
 
 
