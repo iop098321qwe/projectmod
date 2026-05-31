@@ -899,6 +899,13 @@ mkrepo() {
     return 1
   fi
 
+  if gum confirm "Initialize commitlint in this repository?"; then
+    if ! (cd "$target_dir" && mkcommitlint); then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Commitlint initialization failed."
+      return 1
+    fi
+  fi
+
   # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
