@@ -14,7 +14,8 @@ git-flow defaults.
 - `mkskill`: Create a new OpenCode skill with git, GitHub, and
   scaffolding.
 - `mkcommitlint`: Add Commitlint and Husky commit message validation to the
-  current branch with incremental setup commits.
+  current branch with incremental setup commits. Pushes only the current
+  branch when a remote is configured.
 
 ## Aliases
 - None.
