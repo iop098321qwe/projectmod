@@ -1274,6 +1274,25 @@ mkcommitlint() {
     ;;
   esac
 
+  local remote_name=""
+
+  if git -C "$target_dir" remote get-url origin >/dev/null 2>&1; then
+    remote_name="origin"
+  else
+    local remote_candidate
+
+    while IFS= read -r remote_candidate; do
+      remote_name="$remote_candidate"
+      break
+    done < <(git -C "$target_dir" remote)
+  fi
+
+  local push_action="skip; no remote configured"
+
+  if [ -n "$remote_name" ]; then
+    push_action="push main and develop to $remote_name"
+  fi
+
   # --------------------------------------------------------------------------
   # Resolve package manager
   # --------------------------------------------------------------------------
@@ -1391,6 +1410,7 @@ mkcommitlint() {
     "  Path: $display_dir" \
     "  Baseline commit: $initial_commit_action" \
     "  Branches: update $setup_branch and $sync_branch" \
+    "  Remote push: $push_action" \
     "  Package manager: $package_manager ($package_manager_source)" \
     "  Package file: $package_action" \
     "  Commitlint config: $config_action" \
@@ -1405,6 +1425,21 @@ mkcommitlint() {
     cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
     return 0
   fi
+
+  ensure_sync_branch() {
+    if git -C "$target_dir" show-ref --verify --quiet "refs/heads/$sync_branch"; then
+      return 0
+    fi
+
+    if [ -n "$remote_name" ] && \
+      git -C "$target_dir" show-ref --verify --quiet "refs/remotes/$remote_name/$sync_branch"; then
+      if ! gum spin --spinner dot --title "Creating local $sync_branch branch..." -- \
+        git -C "$target_dir" branch --track "$sync_branch" "$remote_name/$sync_branch"; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create local $sync_branch branch."
+        return 1
+      fi
+    fi
+  }
 
   commit_bootstrap_paths() {
     local subject="$1"
@@ -1430,6 +1465,10 @@ mkcommitlint() {
       return 1
     fi
   }
+
+  if ! ensure_sync_branch; then
+    return 1
+  fi
 
   local sync_branch_exists="false"
 
@@ -1751,9 +1790,18 @@ mkcommitlint() {
     return 1
   fi
 
+  if [ -n "$remote_name" ]; then
+    if ! gum spin --spinner dot --title "Pushing main and develop to remote..." -- \
+      git -C "$target_dir" push -u "$remote_name" main develop; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push main and develop branches."
+      return 1
+    fi
+  fi
+
   cbc_style_box "$CATPPUCCIN_GREEN" "Commitlint bootstrapped successfully!" \
     "  Path: $target_dir" \
     "  Branches: main, develop" \
+    "  Remote: ${remote_name:-none}" \
     "  Config: ${commitlint_config:-commitlint.config.cjs}" \
     "  Hook: .husky/commit-msg"
 }
