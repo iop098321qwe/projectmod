@@ -1291,9 +1291,39 @@ mkcommitlint() {
     has_commits="true"
   fi
 
-  if [ -z "$(git -C "$target_dir" branch --show-current)" ]; then
+  local current_branch
+  current_branch="$(git -C "$target_dir" branch --show-current)" || {
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Could not determine current branch."
+    return 1
+  }
+
+  if [ -z "$current_branch" ]; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: mkcommitlint cannot run from a detached HEAD."
     return 1
+  fi
+
+  local remote_name=""
+  local configured_remote
+  configured_remote="$(git -C "$target_dir" config "branch.$current_branch.remote" 2>/dev/null || true)"
+
+  if [ -n "$configured_remote" ] && \
+    git -C "$target_dir" remote get-url "$configured_remote" >/dev/null 2>&1; then
+    remote_name="$configured_remote"
+  elif git -C "$target_dir" remote get-url origin >/dev/null 2>&1; then
+    remote_name="origin"
+  else
+    local remote_candidate
+
+    while IFS= read -r remote_candidate; do
+      remote_name="$remote_candidate"
+      break
+    done < <(git -C "$target_dir" remote)
+  fi
+
+  local push_action="skip; no remote configured"
+
+  if [ -n "$remote_name" ]; then
+    push_action="push $current_branch to $remote_name"
   fi
 
   # --------------------------------------------------------------------------
@@ -1411,7 +1441,9 @@ mkcommitlint() {
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Commitlint Bootstrap" \
     "  Repository: $repo_name" \
     "  Path: $display_dir" \
+    "  Branch: $current_branch" \
     "  Baseline commit: $initial_commit_action" \
+    "  Remote push: $push_action" \
     "  Package manager: $package_manager ($package_manager_source)" \
     "  Package file: $package_action" \
     "  Commitlint config: $config_action" \
@@ -1705,8 +1737,18 @@ mkcommitlint() {
 
   rm -f "$message_file"
 
+  if [ -n "$remote_name" ]; then
+    if ! gum spin --spinner dot --title "Pushing $current_branch to remote..." -- \
+      git -C "$target_dir" push -u "$remote_name" "$current_branch"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push $current_branch branch."
+      return 1
+    fi
+  fi
+
   cbc_style_box "$CATPPUCCIN_GREEN" "Commitlint bootstrapped successfully!" \
     "  Path: $target_dir" \
+    "  Branch: $current_branch" \
+    "  Remote: ${remote_name:-none}" \
     "  Config: ${commitlint_config:-commitlint.config.cjs}" \
     "  Hook: .husky/commit-msg"
 }
