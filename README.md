@@ -9,8 +9,8 @@ git-flow defaults.
 - `mkmod`: Create a new CBC module with git, GitHub, `AGENTS.md`, and
   scaffolding.
 - `mkrepo`: Create a generic repository with git, `README.md`, `AGENTS.md`,
-  and bootstrap scaffolding. Can publish to GitHub with a `LICENSE` or stay
-  local only.
+  and bootstrap scaffolding. Can publish to GitHub with a `LICENSE`, stay
+  local only, and optionally initialize Commitlint.
 - `mkskill`: Create a new OpenCode skill with git, GitHub, and
   scaffolding.
 - `mkcommitlint`: Add Commitlint and Husky commit message validation to
