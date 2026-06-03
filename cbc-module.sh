@@ -182,6 +182,22 @@ EOF
   } > "$target_dir/AGENTS.md"
 }
 
+cbc_create_empty_initial_commit() {
+  local target_dir="$1"
+  local body="$2"
+  local -a commit_args=(-m "chore: initial commit")
+
+  if [ -n "$body" ]; then
+    commit_args+=(-m "$body")
+  fi
+
+  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
+    git -C "$target_dir" commit --allow-empty "${commit_args[@]}"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
+    return 1
+  fi
+}
+
 cbc_align_scaffold_branches() {
   local target_dir="$1"
   local remote_name=""
@@ -348,15 +364,13 @@ mkmod() {
   fi
 
   # --------------------------------------------------------------------------
-  # Create directory and cbc-module.sh
+  # Create directory
   # --------------------------------------------------------------------------
   if ! gum spin --spinner dot --title "Creating directory..." -- \
     mkdir -p "$target_dir"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create directory."
     return 1
   fi
-
-  printf '#!/usr/bin/env bash\n' > "$target_dir/cbc-module.sh"
 
   # --------------------------------------------------------------------------
   # Git init with main as default branch
@@ -370,9 +384,18 @@ mkmod() {
   # --------------------------------------------------------------------------
   # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
-    bash -c "git -C \"$target_dir\" add cbc-module.sh && git -C \"$target_dir\" commit -m 'chore: initial commit'"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
+  if ! cbc_create_empty_initial_commit "$target_dir"; then
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # cbc-module.sh
+  # --------------------------------------------------------------------------
+  printf '#!/usr/bin/env bash\n' > "$target_dir/cbc-module.sh"
+
+  if ! gum spin --spinner dot --title "Creating module entrypoint commit..." -- \
+    bash -c 'git -C "$1" add cbc-module.sh && git -C "$1" commit -m "feat(module): add module entrypoint" -m "Add the CBC module shell entrypoint scaffold."' _ "$target_dir"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: module entrypoint commit failed."
     return 1
   fi
 
@@ -421,7 +444,7 @@ mkmod() {
   fi
 
   if ! gum spin --spinner dot --title "Creating GPL-3.0 license..." -- \
-    bash -c "cd \"$target_dir\" && gh license create gpl-3.0 && git add LICENSE && git commit -m 'add GPL-3.0 license'"; then
+    bash -c "cd \"$target_dir\" && gh license create gpl-3.0 && git add LICENSE && git commit -m 'chore(license): add GPL-3.0 license' -m 'Add the project license file before publishing the repository to GitHub.'"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: License creation failed."
     return 1
   fi
@@ -827,9 +850,7 @@ mkrepo() {
   # --------------------------------------------------------------------------
   # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
-    git -C "$target_dir" commit --allow-empty -m "chore: initial commit"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
+  if ! cbc_create_empty_initial_commit "$target_dir"; then
     return 1
   fi
 
@@ -1116,15 +1137,13 @@ mkskill() {
   fi
 
   # --------------------------------------------------------------------------
-  # Create directory and SKILL.md
+  # Create directory
   # --------------------------------------------------------------------------
   if ! gum spin --spinner dot --title "Creating skill directory..." -- \
     mkdir -p "$target_dir"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create directory."
     return 1
   fi
-
-  printf '' > "$target_dir/SKILL.md"
 
   # --------------------------------------------------------------------------
   # Git init with main as default branch
@@ -1138,9 +1157,18 @@ mkskill() {
   # --------------------------------------------------------------------------
   # chore: initial commit
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
-    bash -c "git -C \"$target_dir\" add SKILL.md && git -C \"$target_dir\" commit -m 'chore: initial commit'"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
+  if ! cbc_create_empty_initial_commit "$target_dir"; then
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # SKILL.md
+  # --------------------------------------------------------------------------
+  printf '' > "$target_dir/SKILL.md"
+
+  if ! gum spin --spinner dot --title "Creating skill scaffold commit..." -- \
+    bash -c 'git -C "$1" add SKILL.md && git -C "$1" commit -m "feat(skill): add skill scaffold" -m "Add the OpenCode skill definition scaffold."' _ "$target_dir"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: skill scaffold commit failed."
     return 1
   fi
 
@@ -1484,11 +1512,9 @@ mkcommitlint() {
   # chore: initial commit
   # --------------------------------------------------------------------------
   if [ "$has_commits" != "true" ]; then
-    if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
-      git -C "$target_dir" commit --allow-empty \
-        -m "chore: initial commit" \
-        -m "Create a clean repository baseline before adding commitlint automation."; then
-      cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
+    if ! cbc_create_empty_initial_commit \
+      "$target_dir" \
+      "Create a clean repository baseline before adding commitlint automation."; then
       return 1
     fi
   fi
