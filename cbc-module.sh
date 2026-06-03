@@ -394,7 +394,7 @@ mkmod() {
   printf '#!/usr/bin/env bash\n' > "$target_dir/cbc-module.sh"
 
   if ! gum spin --spinner dot --title "Creating module entrypoint commit..." -- \
-    bash -c 'git -C "$1" add cbc-module.sh && git -C "$1" commit -m "feat(module): add module entrypoint" -m "Add the CBC module shell entrypoint scaffold."' _ "$target_dir"; then
+    bash -c 'git -C "$1" add cbc-module.sh && git -C "$1" commit -m "chore(module): add module entrypoint" -m "Add the CBC module shell entrypoint scaffold."' _ "$target_dir"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: module entrypoint commit failed."
     return 1
   fi
@@ -1167,7 +1167,7 @@ mkskill() {
   printf '' > "$target_dir/SKILL.md"
 
   if ! gum spin --spinner dot --title "Creating skill scaffold commit..." -- \
-    bash -c 'git -C "$1" add SKILL.md && git -C "$1" commit -m "feat(skill): add skill scaffold" -m "Add the OpenCode skill definition scaffold."' _ "$target_dir"; then
+    bash -c 'git -C "$1" add SKILL.md && git -C "$1" commit -m "chore(skill): add skill scaffold" -m "Add the OpenCode skill definition scaffold."' _ "$target_dir"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: skill scaffold commit failed."
     return 1
   fi
