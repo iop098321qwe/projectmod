@@ -4,6 +4,9 @@ Bootstrap new repositories, CBC modules, and OpenCode skills with git and
 optional GitHub publishing. Guides setup for repo creation, licensing, and
 git-flow defaults.
 
+New repository bootstraps start with an empty `chore: initial commit`, then
+record generated files as incremental Conventional Commits.
+
 ## Functions
 
 - `mkmod`: Create a new CBC module with git, GitHub, `AGENTS.md`,
@@ -17,5 +20,13 @@ git-flow defaults.
   current branch with incremental setup commits. Pushes only the current
   branch when a remote is configured.
 
+## Commit History
+
+- `mkmod`, `mkrepo`, `mkskill`, and new-history `mkcommitlint` runs create an
+  empty `chore: initial commit` before scaffold files are committed.
+- Generated scaffold changes use separate Conventional Commits so each setup
+  step remains reviewable.
+
 ## Aliases
+
 - None.
