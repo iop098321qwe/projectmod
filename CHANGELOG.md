@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.9](https://github.com/iop098321qwe/projectmod/compare/v0.0.8...v0.0.9) (2026-06-08)
+
+
+### Features
+
+* **function:** default to empty initial commits ([8ec99fc](https://github.com/iop098321qwe/projectmod/commit/8ec99fc1529256b650785d3e3b4482373ac087ae))
+
 ## [0.0.8](https://github.com/iop098321qwe/projectmod/compare/v0.0.7...v0.0.8) (2026-05-31)
 
 
