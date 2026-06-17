@@ -1,8 +1,8 @@
 # Projectmod
 
-Bootstrap new repositories, CBC modules, and OpenCode skills with git and
-optional GitHub publishing. Guides setup for repo creation, licensing, and
-git-flow defaults.
+Bootstrap new repositories, CBC modules, OpenCode skills, and Zensical docs
+with git and optional GitHub publishing. Guides setup for repo creation,
+licensing, and git-flow defaults.
 
 New repository bootstraps start with an empty `chore: initial commit`, then
 record generated files as incremental Conventional Commits.
@@ -19,6 +19,8 @@ record generated files as incremental Conventional Commits.
 - `mkcommitlint`: Add Commitlint and Husky commit message validation to the
   current branch with incremental setup commits. Pushes only the current
   branch when a remote is configured.
+- `mkzendocs`: Bootstrap Zensical documentation in the current directory with
+  a local Python virtual environment and prompted `site_name` configuration.
 
 ## Commit History
 
