@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.10](https://github.com/iop098321qwe/projectmod/compare/v0.0.9...v0.0.10) (2026-06-17)
+
+
+### Features
+
+* **function:** add Zensical docs bootstrap ([b65a655](https://github.com/iop098321qwe/projectmod/commit/b65a65551dc17a83f37f9c2ef2cadf25410da0bc))
+
 ## [0.0.9](https://github.com/iop098321qwe/projectmod/compare/v0.0.8...v0.0.9) (2026-06-08)
 
 
