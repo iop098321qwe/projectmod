@@ -1226,6 +1226,174 @@ mkskill() {
 }
 
 ################################################################################
+# MKZENDOCS
+################################################################################
+
+mkzendocs() {
+  OPTIND=1
+
+  usage() {
+    cbc_style_box "$CATPPUCCIN_MAUVE" "Description:" \
+      "  Bootstrap Zensical documentation in the current directory."
+
+    cbc_style_box "$CATPPUCCIN_BLUE" "Usage:" \
+      "  mkzendocs [-h]"
+
+    cbc_style_box "$CATPPUCCIN_TEAL" "Options:" \
+      "  -h    Display this help message"
+
+    cbc_style_box "$CATPPUCCIN_PEACH" "Examples:" \
+      "  mkzendocs"
+  }
+
+  while getopts ":h" opt; do
+    case ${opt} in
+    h)
+      usage
+      return 0
+      ;;
+    \?)
+      cbc_style_message "$CATPPUCCIN_RED" "Invalid option: -$OPTARG"
+      usage
+      return 1
+      ;;
+    esac
+  done
+
+  shift $((OPTIND - 1))
+
+  # --------------------------------------------------------------------------
+  # Preflight: required tools
+  # --------------------------------------------------------------------------
+  local cmd
+  for cmd in gum python3; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: missing required command: $cmd"
+      return 1
+    fi
+  done
+
+  if [ "$(uname -s)" != "Linux" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: mkzendocs uses the Linux pip install flow."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Resolve target directory
+  # --------------------------------------------------------------------------
+  local target_dir
+  target_dir="$(pwd -P)"
+
+  if [ -f "$target_dir/zensical.toml" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical.toml already exists."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Prompt for site name
+  # --------------------------------------------------------------------------
+  local site_name
+  site_name=$(gum input --placeholder "Enter site_name for zensical.toml") || {
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+    return 0
+  }
+
+  if [ -z "$site_name" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: No site_name provided."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Confirm before proceeding
+  # --------------------------------------------------------------------------
+  cbc_style_box "$CATPPUCCIN_LAVENDER" "Zensical Documentation" \
+    "  Directory: $target_dir" \
+    "  Site name: $site_name"
+
+  if ! gum confirm "Bootstrap Zensical docs in this directory?"; then
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+    return 0
+  fi
+
+  # --------------------------------------------------------------------------
+  # Linux pip installation
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Creating Python virtual environment..." -- \
+    python3 -m venv "$target_dir/.venv"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create Python virtual environment."
+    return 1
+  fi
+
+  if ! gum spin --spinner dot --title "Installing Zensical with pip..." -- \
+    bash -c 'source "$1/.venv/bin/activate" && pip install zensical' _ "$target_dir"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install Zensical."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Zensical project scaffold
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Creating Zensical project..." -- \
+    bash -c 'source "$1/.venv/bin/activate" && cd "$1" && zensical new .' _ "$target_dir"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical new . failed."
+    return 1
+  fi
+
+  if [ ! -f "$target_dir/zensical.toml" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical.toml was not created."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # site_name configuration
+  # --------------------------------------------------------------------------
+  if ! python3 - "$target_dir/zensical.toml" "$site_name" <<'PY'
+import json
+import re
+import sys
+
+config_path = sys.argv[1]
+site_name = sys.argv[2]
+
+with open(config_path, "r", encoding="utf-8", newline="") as config_file:
+    lines = config_file.readlines()
+
+updated = False
+
+for index, line in enumerate(lines):
+    if re.match(r"^\s*site_name\s*=", line):
+        newline = ""
+        if line.endswith("\r\n"):
+            newline = "\r\n"
+        elif line.endswith("\n"):
+            newline = "\n"
+
+        indent = re.match(r"^\s*", line).group(0)
+        lines[index] = f"{indent}site_name = {json.dumps(site_name)}{newline}"
+        updated = True
+        break
+
+if not updated:
+    raise SystemExit("site_name setting not found in zensical.toml")
+
+with open(config_path, "w", encoding="utf-8", newline="") as config_file:
+    config_file.writelines(lines)
+PY
+  then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update site_name."
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # Success
+  # --------------------------------------------------------------------------
+  cbc_style_box "$CATPPUCCIN_GREEN" "Zensical docs bootstrapped successfully!" \
+    "  Path: $target_dir" \
+    "  Config: zensical.toml" \
+    "  Site name: $site_name"
+}
+
+################################################################################
 # MKCOMMITLINT
 ################################################################################
 
