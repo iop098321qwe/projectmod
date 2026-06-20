@@ -1282,7 +1282,22 @@ mkzendocs() {
   # Resolve target directory
   # --------------------------------------------------------------------------
   local target_dir
-  target_dir="$(pwd -P)"
+
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    target_dir="$(git rev-parse --show-toplevel)" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Could not resolve git repository root."
+      return 1
+    }
+  else
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Warning: mkzendocs is not being run within a git repository."
+
+    if ! gum confirm "Proceed in the current directory?"; then
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+      return 0
+    fi
+
+    target_dir="$(pwd -P)"
+  fi
 
   if [ -f "$target_dir/zensical.toml" ]; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: zensical.toml already exists."
