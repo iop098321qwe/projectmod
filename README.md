@@ -19,11 +19,12 @@ record generated files as incremental Conventional Commits.
 - `mkcommitlint`: Add Commitlint and Husky commit message validation to the
   current branch with incremental setup commits. Pushes only the current
   branch when a remote is configured.
-- `mkzendocs`: Bootstrap Zensical documentation from the repository root
-  when available, or with confirmation outside a repository. Uses a local
-  Python virtual environment, prompted `site_name` configuration, and
-  relative docs symlinks for existing `README.md`, `CHANGELOG.md`, and
-  `AGENTS.md` files.
+- `mkzendocs`: Idempotently bootstrap Zensical documentation from the
+  repository root when available, or with confirmation outside a repository.
+  Recreates the ignored local `.venv` as needed, prompts for `site_name` when
+  creating `zensical.toml`, creates incremental Conventional Commits for
+  generated docs artifacts and root-doc symlinks, and pushes the current branch
+  when a remote is configured.
 
 ## Commit History
 
@@ -31,6 +32,8 @@ record generated files as incremental Conventional Commits.
   empty `chore: initial commit` before scaffold files are committed.
 - Generated scaffold changes use separate Conventional Commits so each setup
   step remains reviewable.
+- `mkzendocs` commits each generated documentation artifact and root-doc
+  symlink separately, skipping commits for unchanged files.
 
 ## Aliases
 
