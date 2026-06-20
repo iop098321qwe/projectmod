@@ -1282,25 +1282,102 @@ mkzendocs() {
   # Resolve target directory
   # --------------------------------------------------------------------------
   local target_dir
-  target_dir="$(pwd -P)"
+  local in_git_repo="false"
 
-  if [ -f "$target_dir/zensical.toml" ]; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical.toml already exists."
-    return 1
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    in_git_repo="true"
+    target_dir="$(git rev-parse --show-toplevel)" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Could not resolve git repository root."
+      return 1
+    }
+  else
+    cbc_style_message "$CATPPUCCIN_YELLOW" "Warning: mkzendocs is not being run within a git repository."
+
+    if ! gum confirm "Proceed in the current directory?"; then
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+      return 0
+    fi
+
+    target_dir="$(pwd -P)"
+  fi
+
+  local current_branch=""
+  local remote_name=""
+  local push_action="skip; not in a git repository"
+
+  if [ "$in_git_repo" = "true" ]; then
+    local dirty_status
+    dirty_status="$(
+      git -C "$target_dir" status --porcelain --untracked-files=all |
+        grep -Ev '^.. \.venv(/|$)' || true
+    )"
+
+    if [ -n "$dirty_status" ]; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: mkzendocs creates commits and requires a clean worktree."
+      return 1
+    fi
+
+    current_branch="$(git -C "$target_dir" branch --show-current)" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Could not determine current branch."
+      return 1
+    }
+
+    if [ -z "$current_branch" ]; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: mkzendocs cannot run from a detached HEAD."
+      return 1
+    fi
+
+    local configured_remote
+    configured_remote="$(git -C "$target_dir" config "branch.$current_branch.remote" 2>/dev/null || true)"
+
+    if [ -n "$configured_remote" ] && \
+      git -C "$target_dir" remote get-url "$configured_remote" >/dev/null 2>&1; then
+      remote_name="$configured_remote"
+    elif git -C "$target_dir" remote get-url origin >/dev/null 2>&1; then
+      remote_name="origin"
+    else
+      local remote_candidate
+
+      while IFS= read -r remote_candidate; do
+        remote_name="$remote_candidate"
+        break
+      done < <(git -C "$target_dir" remote)
+    fi
+
+    push_action="skip; no remote configured"
+
+    if [ -n "$remote_name" ]; then
+      push_action="push $current_branch to $remote_name"
+    fi
   fi
 
   # --------------------------------------------------------------------------
-  # Prompt for site name
+  # Resolve documentation mode
   # --------------------------------------------------------------------------
-  local site_name
-  site_name=$(gum input --placeholder "Enter site_name for zensical.toml") || {
-    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
-    return 0
-  }
+  local has_root_docs="false"
+  local doc_file
 
-  if [ -z "$site_name" ]; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: No site_name provided."
-    return 1
+  for doc_file in README.md CHANGELOG.md AGENTS.md; do
+    if [ -f "$target_dir/$doc_file" ]; then
+      has_root_docs="true"
+      break
+    fi
+  done
+
+  local needs_site_name="false"
+  local site_name="existing"
+
+  if [ ! -f "$target_dir/zensical.toml" ]; then
+    needs_site_name="true"
+    site_name=$(gum input --placeholder "Enter site_name for zensical.toml") || {
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+      return 0
+    }
+
+    if [ -z "$site_name" ]; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: No site_name provided."
+      return 1
+    fi
   fi
 
   # --------------------------------------------------------------------------
@@ -1308,6 +1385,9 @@ mkzendocs() {
   # --------------------------------------------------------------------------
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Zensical Documentation" \
     "  Directory: $target_dir" \
+    "  Repository: $in_git_repo" \
+    "  Branch: ${current_branch:-none}" \
+    "  Remote push: $push_action" \
     "  Site name: $site_name"
 
   if ! gum confirm "Bootstrap Zensical docs in this directory?"; then
@@ -1315,28 +1395,142 @@ mkzendocs() {
     return 0
   fi
 
+  commit_zendocs_paths() {
+    [ "$in_git_repo" = "true" ] || return 0
+
+    local subject="$1"
+    local body="$2"
+    local pathspec
+
+    shift 2
+
+    for pathspec in "$@"; do
+      if [ -e "$target_dir/$pathspec" ] || [ -L "$target_dir/$pathspec" ] || \
+        git -C "$target_dir" ls-files --error-unmatch "$pathspec" >/dev/null 2>&1; then
+        git -C "$target_dir" add -- "$pathspec" || return 1
+      fi
+    done
+
+    if git -C "$target_dir" diff --cached --quiet; then
+      return 0
+    fi
+
+    if ! gum spin --spinner dot --title "Creating commit: $subject" -- \
+      git -C "$target_dir" commit -m "$subject" -m "$body"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create commit: $subject"
+      return 1
+    fi
+  }
+
   # --------------------------------------------------------------------------
-  # Linux pip installation
+  # Ignore local Python environment
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating Python virtual environment..." -- \
-    python3 -m venv "$target_dir/.venv"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create Python virtual environment."
+  local gitignore_file="$target_dir/.gitignore"
+
+  if [ -f "$gitignore_file" ]; then
+    if ! grep -Eq '^[[:space:]]*\.venv/?[[:space:]]*$' "$gitignore_file"; then
+      {
+        printf '\n'
+        printf '%s\n' '.venv/'
+      } >> "$gitignore_file" || {
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update .gitignore."
+        return 1
+      }
+    fi
+  else
+    printf '%s\n' '.venv/' > "$gitignore_file" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create .gitignore."
+      return 1
+    }
+  fi
+
+  if ! commit_zendocs_paths \
+    "chore(gitignore): ignore Python virtual environment" \
+    "Keep the local mkzendocs Python virtual environment out of repository history." \
+    .gitignore; then
     return 1
   fi
 
-  if ! gum spin --spinner dot --title "Installing Zensical with pip..." -- \
-    bash -c 'source "$1/.venv/bin/activate" && pip install zensical' _ "$target_dir"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install Zensical."
-    return 1
+  # --------------------------------------------------------------------------
+  # Linux pip installation
+  # --------------------------------------------------------------------------
+  if [ ! -x "$target_dir/.venv/bin/python" ]; then
+    if ! gum spin --spinner dot --title "Creating Python virtual environment..." -- \
+      python3 -m venv "$target_dir/.venv"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create Python virtual environment."
+      return 1
+    fi
+  fi
+
+  if [ ! -x "$target_dir/.venv/bin/zensical" ]; then
+    if ! gum spin --spinner dot --title "Installing Zensical with pip..." -- \
+      bash -c '"$1/.venv/bin/python" -m pip install zensical' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install Zensical."
+      return 1
+    fi
   fi
 
   # --------------------------------------------------------------------------
   # Zensical project scaffold
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating Zensical project..." -- \
-    bash -c 'source "$1/.venv/bin/activate" && cd "$1" && zensical new .' _ "$target_dir"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical new . failed."
-    return 1
+  local needs_zensical_scaffold="false"
+
+  if [ ! -f "$target_dir/zensical.toml" ]; then
+    needs_zensical_scaffold="true"
+  elif [ "$has_root_docs" != "true" ]; then
+    if [ ! -f "$target_dir/docs/index.md" ] || \
+      [ ! -f "$target_dir/docs/markdown.md" ]; then
+      needs_zensical_scaffold="true"
+    fi
+  fi
+
+  if [ "$needs_zensical_scaffold" = "true" ]; then
+    local scaffold_dir
+    scaffold_dir="$(mktemp -d)" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create temporary scaffold directory."
+      return 1
+    }
+
+    if ! mkdir -p "$scaffold_dir/project"; then
+      rm -rf "$scaffold_dir"
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to prepare temporary scaffold directory."
+      return 1
+    fi
+
+    if ! gum spin --spinner dot --title "Creating Zensical project..." -- \
+      bash -c 'cd "$2/project" && "$1/.venv/bin/zensical" new .' _ "$target_dir" "$scaffold_dir"; then
+      rm -rf "$scaffold_dir"
+      cbc_style_message "$CATPPUCCIN_RED" "Error: zensical new . failed."
+      return 1
+    fi
+
+    if [ ! -f "$target_dir/zensical.toml" ]; then
+      if ! cp "$scaffold_dir/project/zensical.toml" "$target_dir/zensical.toml"; then
+        rm -rf "$scaffold_dir"
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create zensical.toml."
+        return 1
+      fi
+    fi
+
+    if [ "$has_root_docs" != "true" ]; then
+      if ! mkdir -p "$target_dir/docs"; then
+        rm -rf "$scaffold_dir"
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create docs directory."
+        return 1
+      fi
+
+      for doc_file in index.md markdown.md; do
+        [ ! -e "$target_dir/docs/$doc_file" ] || continue
+
+        if ! cp "$scaffold_dir/project/docs/$doc_file" "$target_dir/docs/$doc_file"; then
+          rm -rf "$scaffold_dir"
+          cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create docs/$doc_file."
+          return 1
+        fi
+      done
+    fi
+
+    rm -rf "$scaffold_dir"
   fi
 
   if [ ! -f "$target_dir/zensical.toml" ]; then
@@ -1347,7 +1541,8 @@ mkzendocs() {
   # --------------------------------------------------------------------------
   # site_name configuration
   # --------------------------------------------------------------------------
-  if ! python3 - "$target_dir/zensical.toml" "$site_name" <<'PY'
+  if [ "$needs_site_name" = "true" ] && \
+    ! python3 - "$target_dir/zensical.toml" "$site_name" <<'PY'
 import json
 import re
 import sys
@@ -1384,11 +1579,114 @@ PY
     return 1
   fi
 
+  if ! commit_zendocs_paths \
+    "docs(zensical): add zensical configuration" \
+    "Add the Zensical site configuration for repository documentation." \
+    zensical.toml; then
+    return 1
+  fi
+
+  if [ "$has_root_docs" != "true" ]; then
+    if ! commit_zendocs_paths \
+      "docs(zensical): add documentation index" \
+      "Add the default Zensical documentation landing page." \
+      docs/index.md; then
+      return 1
+    fi
+
+    if ! commit_zendocs_paths \
+      "docs(zensical): add markdown guide" \
+      "Add the default Zensical Markdown guide page." \
+      docs/markdown.md; then
+      return 1
+    fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # Root documentation links
+  # --------------------------------------------------------------------------
+  if [ "$has_root_docs" = "true" ]; then
+    if [ ! -d "$target_dir/docs" ]; then
+      if ! mkdir -p "$target_dir/docs"; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: docs directory was not created."
+        return 1
+      fi
+    fi
+
+    if ! rm -f "$target_dir/docs/index.md" "$target_dir/docs/markdown.md"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to remove generated docs pages."
+      return 1
+    fi
+
+    if ! commit_zendocs_paths \
+      "docs(zensical): remove generated docs pages" \
+      "Remove default Zensical pages when root documentation links replace them." \
+      docs/index.md docs/markdown.md; then
+      return 1
+    fi
+
+    for doc_file in README.md CHANGELOG.md AGENTS.md; do
+      [ -f "$target_dir/$doc_file" ] || continue
+
+      if [ -L "$target_dir/docs/$doc_file" ] && \
+        [ "$(readlink "$target_dir/docs/$doc_file")" = "../$doc_file" ]; then
+        continue
+      fi
+
+      if ! rm -f "$target_dir/docs/$doc_file"; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to prepare docs/$doc_file."
+        return 1
+      fi
+
+      if ! ln -s "../$doc_file" "$target_dir/docs/$doc_file"; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to link docs/$doc_file."
+        return 1
+      fi
+
+      case "$doc_file" in
+      README.md)
+        if ! commit_zendocs_paths \
+          "docs(readme): link README into zensical docs" \
+          "Expose the repository README through the generated Zensical docs." \
+          docs/README.md; then
+          return 1
+        fi
+        ;;
+      CHANGELOG.md)
+        if ! commit_zendocs_paths \
+          "docs(changelog): link changelog into zensical docs" \
+          "Expose the repository changelog through the generated Zensical docs." \
+          docs/CHANGELOG.md; then
+          return 1
+        fi
+        ;;
+      AGENTS.md)
+        if ! commit_zendocs_paths \
+          "docs(agents): link AGENTS guide into zensical docs" \
+          "Expose the repository AGENTS guide through the generated Zensical docs." \
+          docs/AGENTS.md; then
+          return 1
+        fi
+        ;;
+      esac
+    done
+  fi
+
+  if [ "$in_git_repo" = "true" ] && [ -n "$remote_name" ]; then
+    if ! gum spin --spinner dot --title "Pushing $current_branch to remote..." -- \
+      git -C "$target_dir" push -u "$remote_name" "$current_branch"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push $current_branch branch."
+      return 1
+    fi
+  fi
+
   # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
   cbc_style_box "$CATPPUCCIN_GREEN" "Zensical docs bootstrapped successfully!" \
     "  Path: $target_dir" \
+    "  Branch: ${current_branch:-none}" \
+    "  Remote: ${remote_name:-none}" \
     "  Config: zensical.toml" \
     "  Site name: $site_name"
 }
