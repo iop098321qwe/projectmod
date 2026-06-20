@@ -19,8 +19,11 @@ record generated files as incremental Conventional Commits.
 - `mkcommitlint`: Add Commitlint and Husky commit message validation to the
   current branch with incremental setup commits. Pushes only the current
   branch when a remote is configured.
-- `mkzendocs`: Bootstrap Zensical documentation in the current directory with
-  a local Python virtual environment and prompted `site_name` configuration.
+- `mkzendocs`: Bootstrap Zensical documentation from the repository root
+  when available, or with confirmation outside a repository. Uses a local
+  Python virtual environment, prompted `site_name` configuration, and
+  relative docs symlinks for existing `README.md`, `CHANGELOG.md`, and
+  `AGENTS.md` files.
 
 ## Commit History
 
