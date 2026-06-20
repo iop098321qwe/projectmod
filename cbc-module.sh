@@ -1400,6 +1400,45 @@ PY
   fi
 
   # --------------------------------------------------------------------------
+  # Root documentation links
+  # --------------------------------------------------------------------------
+  local has_root_docs="false"
+  local doc_file
+
+  for doc_file in README.md CHANGELOG.md AGENTS.md; do
+    if [ -f "$target_dir/$doc_file" ]; then
+      has_root_docs="true"
+      break
+    fi
+  done
+
+  if [ "$has_root_docs" = "true" ]; then
+    if [ ! -d "$target_dir/docs" ]; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: docs directory was not created."
+      return 1
+    fi
+
+    if ! rm -f "$target_dir/docs/index.md" "$target_dir/docs/markdown.md"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to remove generated docs pages."
+      return 1
+    fi
+
+    for doc_file in README.md CHANGELOG.md AGENTS.md; do
+      [ -f "$target_dir/$doc_file" ] || continue
+
+      if ! rm -f "$target_dir/docs/$doc_file"; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to prepare docs/$doc_file."
+        return 1
+      fi
+
+      if ! ln -s "../$doc_file" "$target_dir/docs/$doc_file"; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to link docs/$doc_file."
+        return 1
+      fi
+    done
+  fi
+
+  # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
   cbc_style_box "$CATPPUCCIN_GREEN" "Zensical docs bootstrapped successfully!" \
