@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.11](https://github.com/iop098321qwe/projectmod/compare/v0.0.10...v0.0.11) (2026-06-20)
+
+
+### Features
+
+* **function:** commit mkzendocs changes incrementally ([4eee282](https://github.com/iop098321qwe/projectmod/commit/4eee282a5cafc79c754d946a4268298f2b7ba612))
+* **function:** link root docs into zensical docs ([4d7ac48](https://github.com/iop098321qwe/projectmod/commit/4d7ac48b7c743bdbd07bbefa50f91f02f4f42892))
+* **function:** make mkzendocs idempotent ([f099cac](https://github.com/iop098321qwe/projectmod/commit/f099cac5f32cf502961a60ff68cf507bf6be0749))
+* **function:** run mkzendocs from repository root ([0acb746](https://github.com/iop098321qwe/projectmod/commit/0acb7465b89315b100d9d296f1a0b29eb2e35572))
+
 ## [0.0.10](https://github.com/iop098321qwe/projectmod/compare/v0.0.9...v0.0.10) (2026-06-17)
 
 

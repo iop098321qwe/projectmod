@@ -1,6 +1,6 @@
 {
   "name": "projectmod",
-  "version": "1.0.0",
+  "version": "0.0.11",
   "description": "Bootstrap new repositories, CBC modules, OpenCode skills, and Zensical docs with git and optional GitHub publishing. Guides setup for repo creation, licensing, and git-flow defaults.",
   "main": "index.js",
   "directories": {
