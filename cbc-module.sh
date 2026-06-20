@@ -1301,6 +1301,56 @@ mkzendocs() {
     target_dir="$(pwd -P)"
   fi
 
+  local current_branch=""
+  local remote_name=""
+  local push_action="skip; not in a git repository"
+
+  if [ "$in_git_repo" = "true" ]; then
+    local dirty_status
+    dirty_status="$(
+      git -C "$target_dir" status --porcelain --untracked-files=all |
+        grep -Ev '^.. \.venv(/|$)' || true
+    )"
+
+    if [ -n "$dirty_status" ]; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: mkzendocs creates commits and requires a clean worktree."
+      return 1
+    fi
+
+    current_branch="$(git -C "$target_dir" branch --show-current)" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Could not determine current branch."
+      return 1
+    }
+
+    if [ -z "$current_branch" ]; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: mkzendocs cannot run from a detached HEAD."
+      return 1
+    fi
+
+    local configured_remote
+    configured_remote="$(git -C "$target_dir" config "branch.$current_branch.remote" 2>/dev/null || true)"
+
+    if [ -n "$configured_remote" ] && \
+      git -C "$target_dir" remote get-url "$configured_remote" >/dev/null 2>&1; then
+      remote_name="$configured_remote"
+    elif git -C "$target_dir" remote get-url origin >/dev/null 2>&1; then
+      remote_name="origin"
+    else
+      local remote_candidate
+
+      while IFS= read -r remote_candidate; do
+        remote_name="$remote_candidate"
+        break
+      done < <(git -C "$target_dir" remote)
+    fi
+
+    push_action="skip; no remote configured"
+
+    if [ -n "$remote_name" ]; then
+      push_action="push $current_branch to $remote_name"
+    fi
+  fi
+
   # --------------------------------------------------------------------------
   # Resolve documentation mode
   # --------------------------------------------------------------------------
@@ -1336,12 +1386,41 @@ mkzendocs() {
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Zensical Documentation" \
     "  Directory: $target_dir" \
     "  Repository: $in_git_repo" \
+    "  Branch: ${current_branch:-none}" \
+    "  Remote push: $push_action" \
     "  Site name: $site_name"
 
   if ! gum confirm "Bootstrap Zensical docs in this directory?"; then
     cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
     return 0
   fi
+
+  commit_zendocs_paths() {
+    [ "$in_git_repo" = "true" ] || return 0
+
+    local subject="$1"
+    local body="$2"
+    local pathspec
+
+    shift 2
+
+    for pathspec in "$@"; do
+      if [ -e "$target_dir/$pathspec" ] || [ -L "$target_dir/$pathspec" ] || \
+        git -C "$target_dir" ls-files --error-unmatch "$pathspec" >/dev/null 2>&1; then
+        git -C "$target_dir" add -- "$pathspec" || return 1
+      fi
+    done
+
+    if git -C "$target_dir" diff --cached --quiet; then
+      return 0
+    fi
+
+    if ! gum spin --spinner dot --title "Creating commit: $subject" -- \
+      git -C "$target_dir" commit -m "$subject" -m "$body"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create commit: $subject"
+      return 1
+    fi
+  }
 
   # --------------------------------------------------------------------------
   # Ignore local Python environment
@@ -1363,6 +1442,13 @@ mkzendocs() {
       cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create .gitignore."
       return 1
     }
+  fi
+
+  if ! commit_zendocs_paths \
+    "chore(gitignore): ignore Python virtual environment" \
+    "Keep the local mkzendocs Python virtual environment out of repository history." \
+    .gitignore; then
+    return 1
   fi
 
   # --------------------------------------------------------------------------
@@ -1493,6 +1579,29 @@ PY
     return 1
   fi
 
+  if ! commit_zendocs_paths \
+    "docs(zensical): add zensical configuration" \
+    "Add the Zensical site configuration for repository documentation." \
+    zensical.toml; then
+    return 1
+  fi
+
+  if [ "$has_root_docs" != "true" ]; then
+    if ! commit_zendocs_paths \
+      "docs(zensical): add documentation index" \
+      "Add the default Zensical documentation landing page." \
+      docs/index.md; then
+      return 1
+    fi
+
+    if ! commit_zendocs_paths \
+      "docs(zensical): add markdown guide" \
+      "Add the default Zensical Markdown guide page." \
+      docs/markdown.md; then
+      return 1
+    fi
+  fi
+
   # --------------------------------------------------------------------------
   # Root documentation links
   # --------------------------------------------------------------------------
@@ -1506,6 +1615,13 @@ PY
 
     if ! rm -f "$target_dir/docs/index.md" "$target_dir/docs/markdown.md"; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to remove generated docs pages."
+      return 1
+    fi
+
+    if ! commit_zendocs_paths \
+      "docs(zensical): remove generated docs pages" \
+      "Remove default Zensical pages when root documentation links replace them." \
+      docs/index.md docs/markdown.md; then
       return 1
     fi
 
@@ -1526,7 +1642,42 @@ PY
         cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to link docs/$doc_file."
         return 1
       fi
+
+      case "$doc_file" in
+      README.md)
+        if ! commit_zendocs_paths \
+          "docs(readme): link README into zensical docs" \
+          "Expose the repository README through the generated Zensical docs." \
+          docs/README.md; then
+          return 1
+        fi
+        ;;
+      CHANGELOG.md)
+        if ! commit_zendocs_paths \
+          "docs(changelog): link changelog into zensical docs" \
+          "Expose the repository changelog through the generated Zensical docs." \
+          docs/CHANGELOG.md; then
+          return 1
+        fi
+        ;;
+      AGENTS.md)
+        if ! commit_zendocs_paths \
+          "docs(agents): link AGENTS guide into zensical docs" \
+          "Expose the repository AGENTS guide through the generated Zensical docs." \
+          docs/AGENTS.md; then
+          return 1
+        fi
+        ;;
+      esac
     done
+  fi
+
+  if [ "$in_git_repo" = "true" ] && [ -n "$remote_name" ]; then
+    if ! gum spin --spinner dot --title "Pushing $current_branch to remote..." -- \
+      git -C "$target_dir" push -u "$remote_name" "$current_branch"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push $current_branch branch."
+      return 1
+    fi
   fi
 
   # --------------------------------------------------------------------------
@@ -1534,6 +1685,8 @@ PY
   # --------------------------------------------------------------------------
   cbc_style_box "$CATPPUCCIN_GREEN" "Zensical docs bootstrapped successfully!" \
     "  Path: $target_dir" \
+    "  Branch: ${current_branch:-none}" \
+    "  Remote: ${remote_name:-none}" \
     "  Config: zensical.toml" \
     "  Site name: $site_name"
 }
