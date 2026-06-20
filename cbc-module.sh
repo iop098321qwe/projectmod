@@ -1282,8 +1282,10 @@ mkzendocs() {
   # Resolve target directory
   # --------------------------------------------------------------------------
   local target_dir
+  local in_git_repo="false"
 
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    in_git_repo="true"
     target_dir="$(git rev-parse --show-toplevel)" || {
       cbc_style_message "$CATPPUCCIN_RED" "Error: Could not resolve git repository root."
       return 1
@@ -1299,23 +1301,33 @@ mkzendocs() {
     target_dir="$(pwd -P)"
   fi
 
-  if [ -f "$target_dir/zensical.toml" ]; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical.toml already exists."
-    return 1
-  fi
-
   # --------------------------------------------------------------------------
-  # Prompt for site name
+  # Resolve documentation mode
   # --------------------------------------------------------------------------
-  local site_name
-  site_name=$(gum input --placeholder "Enter site_name for zensical.toml") || {
-    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
-    return 0
-  }
+  local has_root_docs="false"
+  local doc_file
 
-  if [ -z "$site_name" ]; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: No site_name provided."
-    return 1
+  for doc_file in README.md CHANGELOG.md AGENTS.md; do
+    if [ -f "$target_dir/$doc_file" ]; then
+      has_root_docs="true"
+      break
+    fi
+  done
+
+  local needs_site_name="false"
+  local site_name="existing"
+
+  if [ ! -f "$target_dir/zensical.toml" ]; then
+    needs_site_name="true"
+    site_name=$(gum input --placeholder "Enter site_name for zensical.toml") || {
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+      return 0
+    }
+
+    if [ -z "$site_name" ]; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: No site_name provided."
+      return 1
+    fi
   fi
 
   # --------------------------------------------------------------------------
@@ -1323,6 +1335,7 @@ mkzendocs() {
   # --------------------------------------------------------------------------
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Zensical Documentation" \
     "  Directory: $target_dir" \
+    "  Repository: $in_git_repo" \
     "  Site name: $site_name"
 
   if ! gum confirm "Bootstrap Zensical docs in this directory?"; then
@@ -1331,27 +1344,107 @@ mkzendocs() {
   fi
 
   # --------------------------------------------------------------------------
-  # Linux pip installation
+  # Ignore local Python environment
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating Python virtual environment..." -- \
-    python3 -m venv "$target_dir/.venv"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create Python virtual environment."
-    return 1
+  local gitignore_file="$target_dir/.gitignore"
+
+  if [ -f "$gitignore_file" ]; then
+    if ! grep -Eq '^[[:space:]]*\.venv/?[[:space:]]*$' "$gitignore_file"; then
+      {
+        printf '\n'
+        printf '%s\n' '.venv/'
+      } >> "$gitignore_file" || {
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update .gitignore."
+        return 1
+      }
+    fi
+  else
+    printf '%s\n' '.venv/' > "$gitignore_file" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create .gitignore."
+      return 1
+    }
   fi
 
-  if ! gum spin --spinner dot --title "Installing Zensical with pip..." -- \
-    bash -c 'source "$1/.venv/bin/activate" && pip install zensical' _ "$target_dir"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install Zensical."
-    return 1
+  # --------------------------------------------------------------------------
+  # Linux pip installation
+  # --------------------------------------------------------------------------
+  if [ ! -x "$target_dir/.venv/bin/python" ]; then
+    if ! gum spin --spinner dot --title "Creating Python virtual environment..." -- \
+      python3 -m venv "$target_dir/.venv"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create Python virtual environment."
+      return 1
+    fi
+  fi
+
+  if [ ! -x "$target_dir/.venv/bin/zensical" ]; then
+    if ! gum spin --spinner dot --title "Installing Zensical with pip..." -- \
+      bash -c '"$1/.venv/bin/python" -m pip install zensical' _ "$target_dir"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to install Zensical."
+      return 1
+    fi
   fi
 
   # --------------------------------------------------------------------------
   # Zensical project scaffold
   # --------------------------------------------------------------------------
-  if ! gum spin --spinner dot --title "Creating Zensical project..." -- \
-    bash -c 'source "$1/.venv/bin/activate" && cd "$1" && zensical new .' _ "$target_dir"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical new . failed."
-    return 1
+  local needs_zensical_scaffold="false"
+
+  if [ ! -f "$target_dir/zensical.toml" ]; then
+    needs_zensical_scaffold="true"
+  elif [ "$has_root_docs" != "true" ]; then
+    if [ ! -f "$target_dir/docs/index.md" ] || \
+      [ ! -f "$target_dir/docs/markdown.md" ]; then
+      needs_zensical_scaffold="true"
+    fi
+  fi
+
+  if [ "$needs_zensical_scaffold" = "true" ]; then
+    local scaffold_dir
+    scaffold_dir="$(mktemp -d)" || {
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create temporary scaffold directory."
+      return 1
+    }
+
+    if ! mkdir -p "$scaffold_dir/project"; then
+      rm -rf "$scaffold_dir"
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to prepare temporary scaffold directory."
+      return 1
+    fi
+
+    if ! gum spin --spinner dot --title "Creating Zensical project..." -- \
+      bash -c 'cd "$2/project" && "$1/.venv/bin/zensical" new .' _ "$target_dir" "$scaffold_dir"; then
+      rm -rf "$scaffold_dir"
+      cbc_style_message "$CATPPUCCIN_RED" "Error: zensical new . failed."
+      return 1
+    fi
+
+    if [ ! -f "$target_dir/zensical.toml" ]; then
+      if ! cp "$scaffold_dir/project/zensical.toml" "$target_dir/zensical.toml"; then
+        rm -rf "$scaffold_dir"
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create zensical.toml."
+        return 1
+      fi
+    fi
+
+    if [ "$has_root_docs" != "true" ]; then
+      if ! mkdir -p "$target_dir/docs"; then
+        rm -rf "$scaffold_dir"
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create docs directory."
+        return 1
+      fi
+
+      for doc_file in index.md markdown.md; do
+        [ ! -e "$target_dir/docs/$doc_file" ] || continue
+
+        if ! cp "$scaffold_dir/project/docs/$doc_file" "$target_dir/docs/$doc_file"; then
+          rm -rf "$scaffold_dir"
+          cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create docs/$doc_file."
+          return 1
+        fi
+      done
+    fi
+
+    rm -rf "$scaffold_dir"
   fi
 
   if [ ! -f "$target_dir/zensical.toml" ]; then
@@ -1362,7 +1455,8 @@ mkzendocs() {
   # --------------------------------------------------------------------------
   # site_name configuration
   # --------------------------------------------------------------------------
-  if ! python3 - "$target_dir/zensical.toml" "$site_name" <<'PY'
+  if [ "$needs_site_name" = "true" ] && \
+    ! python3 - "$target_dir/zensical.toml" "$site_name" <<'PY'
 import json
 import re
 import sys
@@ -1402,20 +1496,12 @@ PY
   # --------------------------------------------------------------------------
   # Root documentation links
   # --------------------------------------------------------------------------
-  local has_root_docs="false"
-  local doc_file
-
-  for doc_file in README.md CHANGELOG.md AGENTS.md; do
-    if [ -f "$target_dir/$doc_file" ]; then
-      has_root_docs="true"
-      break
-    fi
-  done
-
   if [ "$has_root_docs" = "true" ]; then
     if [ ! -d "$target_dir/docs" ]; then
-      cbc_style_message "$CATPPUCCIN_RED" "Error: docs directory was not created."
-      return 1
+      if ! mkdir -p "$target_dir/docs"; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: docs directory was not created."
+        return 1
+      fi
     fi
 
     if ! rm -f "$target_dir/docs/index.md" "$target_dir/docs/markdown.md"; then
@@ -1425,6 +1511,11 @@ PY
 
     for doc_file in README.md CHANGELOG.md AGENTS.md; do
       [ -f "$target_dir/$doc_file" ] || continue
+
+      if [ -L "$target_dir/docs/$doc_file" ] && \
+        [ "$(readlink "$target_dir/docs/$doc_file")" = "../$doc_file" ]; then
+        continue
+      fi
 
       if ! rm -f "$target_dir/docs/$doc_file"; then
         cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to prepare docs/$doc_file."
