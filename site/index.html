@@ -442,7 +442,9 @@
 with git and optional GitHub publishing. Guides setup for repo creation,
 licensing, and git-flow defaults.</p>
 <p>New repository bootstraps start with an empty <code>chore: initial commit</code>, then
-record generated files as incremental Conventional Commits.</p>
+record generated files as incremental Conventional Commits.
+Bootstrap flows that create <code>todo.txt</code> also create a blank
+<code>inbox.txt.tuxedo-lock</code> alongside it for Tuxedo todo workflows.</p>
 <h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>mkmod</code>: Create a new CBC module with git, GitHub, <code>AGENTS.md</code>,
@@ -467,6 +469,8 @@ record generated files as incremental Conventional Commits.</p>
 <ul>
 <li><code>mkmod</code>, <code>mkrepo</code>, <code>mkskill</code>, and new-history <code>mkcommitlint</code> runs create an
   empty <code>chore: initial commit</code> before scaffold files are committed.</li>
+<li>Bootstrap flows that add <code>todo.txt</code> also add a blank
+  <code>inbox.txt.tuxedo-lock</code> in the same directory.</li>
 <li>Generated scaffold changes use separate Conventional Commits so each setup
   step remains reviewable.</li>
 <li>Optional Zensical docs bootstraps run through <code>mkzendocs</code>, preserving its
