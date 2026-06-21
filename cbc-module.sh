@@ -1727,6 +1727,22 @@ PY
     done
   fi
 
+  # --------------------------------------------------------------------------
+  # Static site build
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Building Zensical site..." -- \
+    bash -c 'cd "$1" && "$1/.venv/bin/zensical" build --clean' _ "$target_dir"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical build --clean failed."
+    return 1
+  fi
+
+  if ! commit_zendocs_paths \
+    "build(site): build site" \
+    "Generate the static documentation site from Zensical output." \
+    site; then
+    return 1
+  fi
+
   if [ "$in_git_repo" = "true" ] && [ -n "$remote_name" ]; then
     if ! gum spin --spinner dot --title "Pushing $current_branch to remote..." -- \
       git -C "$target_dir" push -u "$remote_name" "$current_branch"; then
