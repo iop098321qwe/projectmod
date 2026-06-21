@@ -1627,18 +1627,23 @@ EOF
   # --------------------------------------------------------------------------
   local gitignore_file="$target_dir/.gitignore"
 
+  local -a gitignore_entries=(.venv/ .cache/)
+  local gitignore_entry
+
   if [ -f "$gitignore_file" ]; then
-    if ! grep -Eq '^[[:space:]]*\.venv/?[[:space:]]*$' "$gitignore_file"; then
-      {
-        printf '\n'
-        printf '%s\n' '.venv/'
-      } >> "$gitignore_file" || {
-        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update .gitignore."
-        return 1
-      }
-    fi
+    for gitignore_entry in "${gitignore_entries[@]}"; do
+      if ! grep -Eq "^[[:space:]]*${gitignore_entry//\//\/}[[:space:]]*$" "$gitignore_file"; then
+        {
+          printf '\n'
+          printf '%s\n' "$gitignore_entry"
+        } >> "$gitignore_file" || {
+          cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update .gitignore."
+          return 1
+        }
+      fi
+    done
   else
-    printf '%s\n' '.venv/' > "$gitignore_file" || {
+    printf '%s\n' "${gitignore_entries[@]}" > "$gitignore_file" || {
       cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create .gitignore."
       return 1
     }
@@ -2269,7 +2274,7 @@ mkcommitlint() {
   # --------------------------------------------------------------------------
   local gitignore_file="$target_dir/.gitignore"
 
-  local -a gitignore_entries=(node_modules/ .husky/)
+  local -a gitignore_entries=(.cache/ node_modules/ .husky/)
   local gitignore_entry
 
   if [ ! -f "$gitignore_file" ]; then
