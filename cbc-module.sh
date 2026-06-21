@@ -2269,20 +2269,25 @@ mkcommitlint() {
   # --------------------------------------------------------------------------
   local gitignore_file="$target_dir/.gitignore"
 
-  if [ -f "$gitignore_file" ]; then
-    if ! grep -Eq '^[[:space:]]*/?node_modules/?[[:space:]]*$' "$gitignore_file"; then
-      {
-        printf '\n'
-        printf '%s\n' 'node_modules/'
-      } >> "$gitignore_file"
-    fi
+  local -a gitignore_entries=(node_modules/ .husky/)
+  local gitignore_entry
+
+  if [ ! -f "$gitignore_file" ]; then
+    printf '%s\n' "${gitignore_entries[@]}" > "$gitignore_file"
   else
-    printf '%s\n' 'node_modules/' > "$gitignore_file"
+    for gitignore_entry in "${gitignore_entries[@]}"; do
+      if ! grep -Eq "^[[:space:]]*${gitignore_entry//\//\/}[[:space:]]*$" "$gitignore_file"; then
+        {
+          printf '\n'
+          printf '%s\n' "$gitignore_entry"
+        } >> "$gitignore_file"
+      fi
+    done
   fi
 
   if ! commit_bootstrap_paths \
-    "chore(gitignore): ignore node dependencies" \
-    "Keep installed package dependencies out of repository history." \
+    "chore(gitignore): ignore bootstrap dependencies" \
+    "Keep generated dependency and hook directories out of repository history." \
     .gitignore; then
     return 1
   fi
