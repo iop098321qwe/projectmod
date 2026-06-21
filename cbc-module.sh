@@ -1551,6 +1551,7 @@ mkzendocs() {
   # GitHub Pages workflow
   # --------------------------------------------------------------------------
   local docs_workflow_file="$target_dir/.github/workflows/docs.yml"
+  local docs_workflow_created=false
 
   if [ ! -e "$docs_workflow_file" ] && [ ! -L "$docs_workflow_file" ]; then
     if ! mkdir -p "$target_dir/.github/workflows"; then
@@ -1600,6 +1601,8 @@ EOF
       .github/workflows/docs.yml; then
       return 1
     fi
+
+    docs_workflow_created=true
   fi
 
   # --------------------------------------------------------------------------
@@ -1873,6 +1876,17 @@ PY
       git -C "$target_dir" push -u "$remote_name" "$current_branch"; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to push $current_branch branch."
       return 1
+    fi
+  fi
+
+  if [ "$docs_workflow_created" = "true" ] && [ "$in_git_repo" = "true" ] && [ -n "$remote_name" ]; then
+    if command -v gh >/dev/null 2>&1; then
+      cbc_style_message "$CATPPUCCIN_YELLOW" \
+        "Reminder: Enable GitHub Pages via GitHub Actions in your repository settings."
+      ( gh browse --settings >/dev/null 2>&1 & )
+    else
+      cbc_style_message "$CATPPUCCIN_YELLOW" \
+        "Reminder: Enable GitHub Pages via GitHub Actions in your repository settings."
     fi
   fi
 
