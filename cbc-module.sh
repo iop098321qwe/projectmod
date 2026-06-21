@@ -293,6 +293,27 @@ cbc_align_scaffold_branches() {
   fi
 }
 
+cbc_offer_zensical_docs_bootstrap() {
+  local target_dir="$1"
+  local scaffold_type="$2"
+
+  if ! gum confirm "Bootstrap Zensical docs in this $scaffold_type?"; then
+    return 0
+  fi
+
+  if ! (
+    cd "$target_dir" || exit 1
+    CBC_MKZENDOCS_SKIP_CONFIRM=true mkzendocs
+  ); then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Zensical docs bootstrap failed."
+    return 1
+  fi
+
+  if ! cbc_align_scaffold_branches "$target_dir"; then
+    return 1
+  fi
+}
+
 ################################################################################
 # MKMOD
 ################################################################################
@@ -570,6 +591,10 @@ mkmod() {
     if ! cbc_align_scaffold_branches "$target_dir"; then
       return 1
     fi
+  fi
+
+  if ! cbc_offer_zensical_docs_bootstrap "$target_dir" "module"; then
+    return 1
   fi
 
   # --------------------------------------------------------------------------
@@ -1060,6 +1085,10 @@ mkrepo() {
     fi
   fi
 
+  if ! cbc_offer_zensical_docs_bootstrap "$target_dir" "repository"; then
+    return 1
+  fi
+
   # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
@@ -1293,6 +1322,10 @@ mkskill() {
     return 1
   fi
 
+  if ! cbc_offer_zensical_docs_bootstrap "$target_dir" "skill"; then
+    return 1
+  fi
+
   # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
@@ -1472,9 +1505,11 @@ mkzendocs() {
     "  Remote push: $push_action" \
     "  Site name: $site_name"
 
-  if ! gum confirm "Bootstrap Zensical docs in this directory?"; then
-    cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
-    return 0
+  if [ "${CBC_MKZENDOCS_SKIP_CONFIRM:-false}" != "true" ]; then
+    if ! gum confirm "Bootstrap Zensical docs in this directory?"; then
+      cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
+      return 0
+    fi
   fi
 
   if [ "$in_git_repo" = "true" ]; then
