@@ -9,6 +9,9 @@ cbc_agents_file_purpose() {
   AGENTS.md)
     printf '%s' "AI coding agent instructions for this repository."
     ;;
+  inbox.txt.tuxedo-lock)
+    printf '%s' "Blank Tuxedo inbox lock file created alongside todo.txt."
+    ;;
   LICENSE)
     printf '%s' "Project license text."
     ;;
@@ -204,38 +207,52 @@ cbc_create_empty_initial_commit() {
 cbc_ensure_todo_txt() {
   local target_dir="$1"
   local todo_file="$target_dir/todo.txt"
+  local inbox_lock_file="$target_dir/inbox.txt.tuxedo-lock"
 
   if [ -e "$todo_file" ] || [ -L "$todo_file" ]; then
+    :
+  elif ! : > "$todo_file"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create todo.txt."
+    return 1
+  fi
+
+  if [ -e "$inbox_lock_file" ] || [ -L "$inbox_lock_file" ]; then
     return 0
   fi
 
-  if ! : > "$todo_file"; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create todo.txt."
+  if ! : > "$inbox_lock_file"; then
+    cbc_style_message "$CATPPUCCIN_RED" \
+      "Error: Failed to create inbox.txt.tuxedo-lock."
     return 1
   fi
 }
 
 cbc_commit_todo_txt() {
   local target_dir="$1"
+  local pathspec
+  local -a todo_bootstrap_files=(todo.txt inbox.txt.tuxedo-lock)
 
   if ! cbc_ensure_todo_txt "$target_dir"; then
     return 1
   fi
 
-  if [ ! -f "$target_dir/todo.txt" ] && [ ! -L "$target_dir/todo.txt" ]; then
-    return 0
-  fi
+  for pathspec in "${todo_bootstrap_files[@]}"; do
+    if [ ! -f "$target_dir/$pathspec" ] && [ ! -L "$target_dir/$pathspec" ]; then
+      continue
+    fi
 
-  if git -C "$target_dir" check-ignore -q -- todo.txt && \
-    ! git -C "$target_dir" ls-files --error-unmatch todo.txt \
-      >/dev/null 2>&1; then
-    return 0
-  fi
+    if git -C "$target_dir" check-ignore -q -- "$pathspec" && \
+      ! git -C "$target_dir" ls-files --error-unmatch "$pathspec" \
+        >/dev/null 2>&1; then
+      continue
+    fi
 
-  if ! git -C "$target_dir" add -- todo.txt; then
-    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to stage todo.txt."
-    return 1
-  fi
+    if ! git -C "$target_dir" add -- "$pathspec"; then
+      cbc_style_message "$CATPPUCCIN_RED" \
+        "Error: Failed to stage $pathspec."
+      return 1
+    fi
+  done
 
   if git -C "$target_dir" diff --cached --quiet; then
     return 0
@@ -243,8 +260,8 @@ cbc_commit_todo_txt() {
 
   if ! gum spin --spinner dot --title "Creating todo.txt commit..." -- \
     git -C "$target_dir" commit \
-      -m "chore(todo): add todo file" \
-      -m "Add a root todo.txt placeholder for bootstrap workflows."; then
+      -m "chore(todo): add todo files" \
+      -m "Add root todo.txt and inbox.txt.tuxedo-lock placeholders for bootstrap workflows."; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: todo.txt commit failed."
     return 1
   fi
@@ -2252,20 +2269,25 @@ mkcommitlint() {
   # --------------------------------------------------------------------------
   local gitignore_file="$target_dir/.gitignore"
 
-  if [ -f "$gitignore_file" ]; then
-    if ! grep -Eq '^[[:space:]]*/?node_modules/?[[:space:]]*$' "$gitignore_file"; then
-      {
-        printf '\n'
-        printf '%s\n' 'node_modules/'
-      } >> "$gitignore_file"
-    fi
+  local -a gitignore_entries=(node_modules/ .husky/)
+  local gitignore_entry
+
+  if [ ! -f "$gitignore_file" ]; then
+    printf '%s\n' "${gitignore_entries[@]}" > "$gitignore_file"
   else
-    printf '%s\n' 'node_modules/' > "$gitignore_file"
+    for gitignore_entry in "${gitignore_entries[@]}"; do
+      if ! grep -Eq "^[[:space:]]*${gitignore_entry//\//\/}[[:space:]]*$" "$gitignore_file"; then
+        {
+          printf '\n'
+          printf '%s\n' "$gitignore_entry"
+        } >> "$gitignore_file"
+      fi
+    done
   fi
 
   if ! commit_bootstrap_paths \
-    "chore(gitignore): ignore node dependencies" \
-    "Keep installed package dependencies out of repository history." \
+    "chore(gitignore): ignore bootstrap dependencies" \
+    "Keep generated dependency and hook directories out of repository history." \
     .gitignore; then
     return 1
   fi
