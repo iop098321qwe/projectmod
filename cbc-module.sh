@@ -1821,6 +1821,23 @@ mkcommitlint() {
   fi
 
   # --------------------------------------------------------------------------
+  # Resolve package version from the latest release tag
+  # --------------------------------------------------------------------------
+  local release_tag=""
+  local release_version="0.0.0"
+  local release_version_source="no release tag found"
+  local tag_candidate
+
+  while IFS= read -r tag_candidate; do
+    if [[ "$tag_candidate" =~ ^v?([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+      release_tag="$tag_candidate"
+      release_version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+      release_version_source="$release_tag"
+      break
+    fi
+  done < <(git -C "$target_dir" tag --list --sort=-v:refname)
+
+  # --------------------------------------------------------------------------
   # Resolve package manager
   # --------------------------------------------------------------------------
   local package_json="$target_dir/package.json"
@@ -1939,6 +1956,7 @@ mkcommitlint() {
     "  Baseline commit: $initial_commit_action" \
     "  Remote push: $push_action" \
     "  Package manager: $package_manager ($package_manager_source)" \
+    "  Package version: $release_version ($release_version_source)" \
     "  Package file: $package_action" \
     "  Commitlint config: $config_action" \
     "  Husky hook: $hook_action" \
@@ -1971,6 +1989,28 @@ mkcommitlint() {
       git -C "$target_dir" commit -m "$subject" -m "$body"; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create commit: $subject"
       return 1
+    fi
+  }
+
+  sync_release_package_version() {
+    if [ -f "$package_json" ]; then
+      if ! node -e 'const fs = require("fs"); const file = process.argv[1]; const version = process.argv[2]; const pkg = JSON.parse(fs.readFileSync(file, "utf8")); pkg.version = version; fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`);' "$package_json" "$release_version"; then
+        cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update package.json version."
+        return 1
+      fi
+    fi
+
+    if [ "$package_manager" = "npm" ]; then
+      local lock_file
+
+      for lock_file in package-lock.json npm-shrinkwrap.json; do
+        [ -f "$target_dir/$lock_file" ] || continue
+
+        if ! node -e 'const fs = require("fs"); const file = process.argv[1]; const version = process.argv[2]; const lock = JSON.parse(fs.readFileSync(file, "utf8")); lock.version = version; if (lock.packages && lock.packages[""]) { lock.packages[""].version = version; } fs.writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);' "$target_dir/$lock_file" "$release_version"; then
+          cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update $lock_file version."
+          return 1
+        fi
+      done
     fi
   }
 
@@ -2019,6 +2059,10 @@ mkcommitlint() {
     fi
   fi
 
+  if ! sync_release_package_version; then
+    return 1
+  fi
+
   # --------------------------------------------------------------------------
   # Dependencies
   # --------------------------------------------------------------------------
@@ -2052,6 +2096,10 @@ mkcommitlint() {
     fi
     ;;
   esac
+
+  if ! sync_release_package_version; then
+    return 1
+  fi
 
   # --------------------------------------------------------------------------
   # Dependency commit
