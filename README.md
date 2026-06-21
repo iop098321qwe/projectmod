@@ -10,12 +10,13 @@ record generated files as incremental Conventional Commits.
 ## Functions
 
 - `mkmod`: Create a new CBC module with git, GitHub, `AGENTS.md`,
-  scaffolding, and optional Commitlint initialization.
+  scaffolding, optional Commitlint initialization, and optional Zensical docs
+  bootstrap.
 - `mkrepo`: Create a generic repository with git, `README.md`, `AGENTS.md`,
   and bootstrap scaffolding. Can publish to GitHub with a `LICENSE`, stay
-  local only, and optionally initialize Commitlint.
+  local only, and optionally initialize Commitlint and Zensical docs.
 - `mkskill`: Create a new OpenCode skill with git, GitHub, and
-  scaffolding.
+  scaffolding, with optional Zensical docs bootstrap.
 - `mkcommitlint`: Add Commitlint and Husky commit message validation to the
   current branch with incremental setup commits. Pushes only the current
   branch when a remote is configured.
@@ -32,6 +33,8 @@ record generated files as incremental Conventional Commits.
   empty `chore: initial commit` before scaffold files are committed.
 - Generated scaffold changes use separate Conventional Commits so each setup
   step remains reviewable.
+- Optional Zensical docs bootstraps run through `mkzendocs`, preserving its
+  incremental documentation commit history.
 - `mkzendocs` commits each generated documentation artifact and root-doc
   symlink separately, skipping commits for unchanged files.
 
