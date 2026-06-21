@@ -1423,6 +1423,61 @@ mkzendocs() {
   }
 
   # --------------------------------------------------------------------------
+  # GitHub Pages workflow
+  # --------------------------------------------------------------------------
+  local docs_workflow_file="$target_dir/.github/workflows/docs.yml"
+
+  if [ ! -e "$docs_workflow_file" ] && [ ! -L "$docs_workflow_file" ]; then
+    if ! mkdir -p "$target_dir/.github/workflows"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create .github/workflows."
+      return 1
+    fi
+
+    if ! cat > "$docs_workflow_file" <<'EOF'
+name: Documentation
+on:
+  push:
+    branches:
+      - master
+      - main
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - run: pip install zensical
+      - run: zensical build --clean
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deployment
+EOF
+    then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create .github/workflows/docs.yml."
+      return 1
+    fi
+
+    if ! commit_zendocs_paths \
+      "ci(docs): add GitHub Pages workflow" \
+      "Deploy generated Zensical documentation to GitHub Pages." \
+      .github/workflows/docs.yml; then
+      return 1
+    fi
+  fi
+
+  # --------------------------------------------------------------------------
   # Ignore local Python environment
   # --------------------------------------------------------------------------
   local gitignore_file="$target_dir/.gitignore"
