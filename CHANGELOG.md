@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.16](https://github.com/iop098321qwe/projectmod/compare/v0.0.15...v0.0.16) (2026-06-21)
+
+
+### Features
+
+* **todo:** create tuxedo lock file ([dbddb87](https://github.com/iop098321qwe/projectmod/commit/dbddb87283e5730cd2101881610315ca7e3ccee5))
+
+
+### Bug Fixes
+
+* **bootstrap:** ignore husky directory in gitignore ([9e62aee](https://github.com/iop098321qwe/projectmod/commit/9e62aeee68bf9386b9a334f566ca57935275bf3e))
+* **gitignore:** include .cache in generated ignores ([648213f](https://github.com/iop098321qwe/projectmod/commit/648213f9cc257187480741f7c8baf396ca79f27f))
+
 ## [0.0.15](https://github.com/iop098321qwe/projectmod/compare/v0.0.14...v0.0.15) (2026-06-21)
 
 
