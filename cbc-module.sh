@@ -1879,17 +1879,6 @@ PY
     fi
   fi
 
-  if [ "$docs_workflow_created" = "true" ] && [ "$in_git_repo" = "true" ] && [ -n "$remote_name" ]; then
-    if command -v gh >/dev/null 2>&1; then
-      cbc_style_message "$CATPPUCCIN_YELLOW" \
-        "Reminder: Enable GitHub Pages via GitHub Actions in your repository settings."
-      ( gh browse --settings >/dev/null 2>&1 & )
-    else
-      cbc_style_message "$CATPPUCCIN_YELLOW" \
-        "Reminder: Enable GitHub Pages via GitHub Actions in your repository settings."
-    fi
-  fi
-
   # --------------------------------------------------------------------------
   # Success
   # --------------------------------------------------------------------------
@@ -1899,6 +1888,15 @@ PY
     "  Remote: ${remote_name:-none}" \
     "  Config: zensical.toml" \
     "  Site name: $site_name"
+
+  if [ "$docs_workflow_created" = "true" ] && [ "$in_git_repo" = "true" ] && [ -n "$remote_name" ]; then
+    printf '\n'
+    cbc_style_box "$CATPPUCCIN_YELLOW" "Action Required:" \
+      "  Enable GitHub Pages via GitHub Actions in your repository settings."
+    if command -v gh >/dev/null 2>&1; then
+      ( gh browse --settings >/dev/null 2>&1 & )
+    fi
+  fi
 }
 
 ################################################################################
