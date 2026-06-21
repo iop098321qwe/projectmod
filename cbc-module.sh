@@ -1551,6 +1551,7 @@ mkzendocs() {
   # GitHub Pages workflow
   # --------------------------------------------------------------------------
   local docs_workflow_file="$target_dir/.github/workflows/docs.yml"
+  local docs_workflow_created=false
 
   if [ ! -e "$docs_workflow_file" ] && [ ! -L "$docs_workflow_file" ]; then
     if ! mkdir -p "$target_dir/.github/workflows"; then
@@ -1600,6 +1601,8 @@ EOF
       .github/workflows/docs.yml; then
       return 1
     fi
+
+    docs_workflow_created=true
   fi
 
   # --------------------------------------------------------------------------
@@ -1885,6 +1888,15 @@ PY
     "  Remote: ${remote_name:-none}" \
     "  Config: zensical.toml" \
     "  Site name: $site_name"
+
+  if [ "$docs_workflow_created" = "true" ] && [ "$in_git_repo" = "true" ] && [ -n "$remote_name" ]; then
+    printf '\n'
+    cbc_style_box "$CATPPUCCIN_YELLOW" "Action Required:" \
+      "  Enable GitHub Pages via GitHub Actions in your repository settings."
+    if command -v gh >/dev/null 2>&1; then
+      ( gh browse --settings >/dev/null 2>&1 & )
+    fi
+  fi
 }
 
 ################################################################################
