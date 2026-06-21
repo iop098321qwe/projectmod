@@ -12,6 +12,8 @@
         <meta name="author" content="<your name here>">
       
       
+        <link rel="canonical" href="https://iop098321qwe.github.io/projectmod/">
+      
       
       
         <link rel="next" href="./CHANGELOG/">
@@ -444,12 +446,13 @@ record generated files as incremental Conventional Commits.</p>
 <h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>mkmod</code>: Create a new CBC module with git, GitHub, <code>AGENTS.md</code>,
-  scaffolding, and optional Commitlint initialization.</li>
+  scaffolding, optional Commitlint initialization, and optional Zensical docs
+  bootstrap.</li>
 <li><code>mkrepo</code>: Create a generic repository with git, <code>README.md</code>, <code>AGENTS.md</code>,
   and bootstrap scaffolding. Can publish to GitHub with a <code>LICENSE</code>, stay
-  local only, and optionally initialize Commitlint.</li>
+  local only, and optionally initialize Commitlint and Zensical docs.</li>
 <li><code>mkskill</code>: Create a new OpenCode skill with git, GitHub, and
-  scaffolding.</li>
+  scaffolding, with optional Zensical docs bootstrap.</li>
 <li><code>mkcommitlint</code>: Add Commitlint and Husky commit message validation to the
   current branch with incremental setup commits. Pushes only the current
   branch when a remote is configured.</li>
@@ -466,6 +469,8 @@ record generated files as incremental Conventional Commits.</p>
   empty <code>chore: initial commit</code> before scaffold files are committed.</li>
 <li>Generated scaffold changes use separate Conventional Commits so each setup
   step remains reviewable.</li>
+<li>Optional Zensical docs bootstraps run through <code>mkzendocs</code>, preserving its
+  incremental documentation commit history.</li>
 <li><code>mkzendocs</code> commits each generated documentation artifact and root-doc
   symlink separately, skipping commits for unchanged files.</li>
 </ul>
