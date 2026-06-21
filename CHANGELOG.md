@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.13](https://github.com/iop098321qwe/projectmod/compare/v0.0.12...v0.0.13) (2026-06-21)
+
+
+### Features
+
+* **bootstrap:** create todo files ([6657c64](https://github.com/iop098321qwe/projectmod/commit/6657c649c4a90567c8670540a8c83df4842e7a03))
+
+
+### Bug Fixes
+
+* **mkzendocs:** build site artifacts ([b32d81a](https://github.com/iop098321qwe/projectmod/commit/b32d81a6dd439bd149a8e4f96132bb0dcbd94fd4))
+* **mkzendocs:** create docs workflow ([cd6dd87](https://github.com/iop098321qwe/projectmod/commit/cd6dd8752f5bc08a447739160e0a79ecc463163e))
+
 ## [0.0.12](https://github.com/iop098321qwe/projectmod/compare/v0.0.11...v0.0.12) (2026-06-21)
 
 
