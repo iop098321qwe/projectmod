@@ -1,0 +1,4 @@
+x 2026-06-20 2026-06-20 bootstrap commitlint @chore due:2026-06-20
+x 2026-06-20 2026-06-20 make mkcommitlint update project.json with current tagged version @fix due:2026-06-28
+x 2026-06-20 2026-06-20 mkcommitlint should update package.json version with 0.0.0 if no version tag is present @fix due:2026-06-28
+x 2026-06-20 2026-06-20 make mkcommitlint idempotent @fix due:2026-06-28

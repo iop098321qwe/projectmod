@@ -15,6 +15,9 @@ cbc_agents_file_purpose() {
   README.md)
     printf '%s' "Primary repository overview and setup notes."
     ;;
+  todo.txt)
+    printf '%s' "Root task list placeholder for bootstrap workflows."
+    ;;
   cbc-module.sh)
     printf '%s' "CBC module entrypoint and shell workflow functions."
     ;;
@@ -194,6 +197,55 @@ cbc_create_empty_initial_commit() {
   if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
     git -C "$target_dir" commit --allow-empty "${commit_args[@]}"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
+    return 1
+  fi
+}
+
+cbc_ensure_todo_txt() {
+  local target_dir="$1"
+  local todo_file="$target_dir/todo.txt"
+
+  if [ -e "$todo_file" ] || [ -L "$todo_file" ]; then
+    return 0
+  fi
+
+  if ! : > "$todo_file"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create todo.txt."
+    return 1
+  fi
+}
+
+cbc_commit_todo_txt() {
+  local target_dir="$1"
+
+  if ! cbc_ensure_todo_txt "$target_dir"; then
+    return 1
+  fi
+
+  if [ ! -f "$target_dir/todo.txt" ] && [ ! -L "$target_dir/todo.txt" ]; then
+    return 0
+  fi
+
+  if git -C "$target_dir" check-ignore -q -- todo.txt && \
+    ! git -C "$target_dir" ls-files --error-unmatch todo.txt \
+      >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! git -C "$target_dir" add -- todo.txt; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to stage todo.txt."
+    return 1
+  fi
+
+  if git -C "$target_dir" diff --cached --quiet; then
+    return 0
+  fi
+
+  if ! gum spin --spinner dot --title "Creating todo.txt commit..." -- \
+    git -C "$target_dir" commit \
+      -m "chore(todo): add todo file" \
+      -m "Add a root todo.txt placeholder for bootstrap workflows."; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: todo.txt commit failed."
     return 1
   fi
 }
@@ -385,6 +437,13 @@ mkmod() {
   # chore: initial commit
   # --------------------------------------------------------------------------
   if ! cbc_create_empty_initial_commit "$target_dir"; then
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # todo.txt
+  # --------------------------------------------------------------------------
+  if ! cbc_commit_todo_txt "$target_dir"; then
     return 1
   fi
 
@@ -794,9 +853,17 @@ mkrepo() {
     local existing_file
 
     if [ "$publish_github" = "true" ]; then
-      existing_file="$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'LICENSE' ! -name 'AGENTS.md' -print -quit 2>/dev/null)"
+      existing_file="$(
+        find "$target_dir" -mindepth 1 -maxdepth 1 \
+          ! -name '.git' ! -name 'README.md' ! -name 'LICENSE' \
+          ! -name 'AGENTS.md' ! -name 'todo.txt' -print -quit 2>/dev/null
+      )"
     else
-      existing_file="$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'AGENTS.md' -print -quit 2>/dev/null)"
+      existing_file="$(
+        find "$target_dir" -mindepth 1 -maxdepth 1 \
+          ! -name '.git' ! -name 'README.md' ! -name 'AGENTS.md' \
+          ! -name 'todo.txt' -print -quit 2>/dev/null
+      )"
     fi
 
     if [ -n "$existing_file" ]; then
@@ -862,10 +929,11 @@ mkrepo() {
       bash -c '
         if [ "$2" = "true" ]; then
           git -C "$1" add --all -- . ":(exclude)README.md" \
-            ":(exclude)LICENSE" ":(exclude)AGENTS.md"
+            ":(exclude)LICENSE" ":(exclude)AGENTS.md" \
+            ":(exclude)todo.txt"
         else
           git -C "$1" add --all -- . ":(exclude)README.md" \
-            ":(exclude)AGENTS.md"
+            ":(exclude)AGENTS.md" ":(exclude)todo.txt"
         fi
 
         if git -C "$1" diff --cached --quiet; then
@@ -878,6 +946,13 @@ mkrepo() {
       cbc_style_message "$CATPPUCCIN_RED" "Error: Existing files commit failed."
       return 1
     fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # todo.txt
+  # --------------------------------------------------------------------------
+  if ! cbc_commit_todo_txt "$target_dir"; then
+    return 1
   fi
 
   # --------------------------------------------------------------------------
@@ -1162,6 +1237,13 @@ mkskill() {
   fi
 
   # --------------------------------------------------------------------------
+  # todo.txt
+  # --------------------------------------------------------------------------
+  if ! cbc_commit_todo_txt "$target_dir"; then
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
   # SKILL.md
   # --------------------------------------------------------------------------
   printf '' > "$target_dir/SKILL.md"
@@ -1395,6 +1477,14 @@ mkzendocs() {
     return 0
   fi
 
+  if [ "$in_git_repo" = "true" ]; then
+    if ! cbc_commit_todo_txt "$target_dir"; then
+      return 1
+    fi
+  elif ! cbc_ensure_todo_txt "$target_dir"; then
+    return 1
+  fi
+
   commit_zendocs_paths() {
     [ "$in_git_repo" = "true" ] || return 0
 
@@ -1421,6 +1511,61 @@ mkzendocs() {
       return 1
     fi
   }
+
+  # --------------------------------------------------------------------------
+  # GitHub Pages workflow
+  # --------------------------------------------------------------------------
+  local docs_workflow_file="$target_dir/.github/workflows/docs.yml"
+
+  if [ ! -e "$docs_workflow_file" ] && [ ! -L "$docs_workflow_file" ]; then
+    if ! mkdir -p "$target_dir/.github/workflows"; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create .github/workflows."
+      return 1
+    fi
+
+    if ! cat > "$docs_workflow_file" <<'EOF'
+name: Documentation
+on:
+  push:
+    branches:
+      - master
+      - main
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/configure-pages@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - run: pip install zensical
+      - run: zensical build --clean
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deployment
+EOF
+    then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create .github/workflows/docs.yml."
+      return 1
+    fi
+
+    if ! commit_zendocs_paths \
+      "ci(docs): add GitHub Pages workflow" \
+      "Deploy generated Zensical documentation to GitHub Pages." \
+      .github/workflows/docs.yml; then
+      return 1
+    fi
+  fi
 
   # --------------------------------------------------------------------------
   # Ignore local Python environment
@@ -1670,6 +1815,22 @@ PY
         ;;
       esac
     done
+  fi
+
+  # --------------------------------------------------------------------------
+  # Static site build
+  # --------------------------------------------------------------------------
+  if ! gum spin --spinner dot --title "Building Zensical site..." -- \
+    bash -c 'cd "$1" && "$1/.venv/bin/zensical" build --clean' _ "$target_dir"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: zensical build --clean failed."
+    return 1
+  fi
+
+  if ! commit_zendocs_paths \
+    "build(site): build site" \
+    "Generate the static documentation site from Zensical output." \
+    site; then
+    return 1
   fi
 
   if [ "$in_git_repo" = "true" ] && [ -n "$remote_name" ]; then
@@ -1949,11 +2110,18 @@ mkcommitlint() {
     initial_commit_action="create chore: initial commit"
   fi
 
+  local todo_action="create todo.txt"
+
+  if [ -e "$target_dir/todo.txt" ] || [ -L "$target_dir/todo.txt" ]; then
+    todo_action="keep existing todo.txt"
+  fi
+
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Commitlint Bootstrap" \
     "  Repository: $repo_name" \
     "  Path: $display_dir" \
     "  Branch: $current_branch" \
     "  Baseline commit: $initial_commit_action" \
+    "  Todo file: $todo_action" \
     "  Remote push: $push_action" \
     "  Package manager: $package_manager ($package_manager_source)" \
     "  Package version: $release_version ($release_version_source)" \
@@ -2023,6 +2191,13 @@ mkcommitlint() {
       "Create a clean repository baseline before adding commitlint automation."; then
       return 1
     fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # todo.txt
+  # --------------------------------------------------------------------------
+  if ! cbc_commit_todo_txt "$target_dir"; then
+    return 1
   fi
 
   # --------------------------------------------------------------------------
