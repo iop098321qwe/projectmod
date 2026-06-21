@@ -1,2 +1,0 @@
-x 2026-06-21 2026-06-21 open github settings page in browser to enable pages via GitHub Actions @feature due:2026-06-21
-(A) ensure that .husky directory is included in .gitignore when created @fix due:2026-06-30
