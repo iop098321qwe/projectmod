@@ -1,3 +1,5 @@
 .venv/
 .cache/
 node_modules/
+
+.husky/
