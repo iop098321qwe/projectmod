@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.12](https://github.com/iop098321qwe/projectmod/compare/v0.0.11...v0.0.12) (2026-06-21)
+
+
+### Features
+
+* **function:** sync mkcommitlint package version ([f8c8271](https://github.com/iop098321qwe/projectmod/commit/f8c82719800f0dbcf9378b24b95f25e519c07302))
+
 ## [0.0.11](https://github.com/iop098321qwe/projectmod/compare/v0.0.10...v0.0.11) (2026-06-20)
 
 
