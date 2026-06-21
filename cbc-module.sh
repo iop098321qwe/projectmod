@@ -15,6 +15,9 @@ cbc_agents_file_purpose() {
   README.md)
     printf '%s' "Primary repository overview and setup notes."
     ;;
+  todo.txt)
+    printf '%s' "Root task list placeholder for bootstrap workflows."
+    ;;
   cbc-module.sh)
     printf '%s' "CBC module entrypoint and shell workflow functions."
     ;;
@@ -194,6 +197,55 @@ cbc_create_empty_initial_commit() {
   if ! gum spin --spinner dot --title "Creating chore: initial commit..." -- \
     git -C "$target_dir" commit --allow-empty "${commit_args[@]}"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: chore: initial commit failed."
+    return 1
+  fi
+}
+
+cbc_ensure_todo_txt() {
+  local target_dir="$1"
+  local todo_file="$target_dir/todo.txt"
+
+  if [ -e "$todo_file" ] || [ -L "$todo_file" ]; then
+    return 0
+  fi
+
+  if ! : > "$todo_file"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create todo.txt."
+    return 1
+  fi
+}
+
+cbc_commit_todo_txt() {
+  local target_dir="$1"
+
+  if ! cbc_ensure_todo_txt "$target_dir"; then
+    return 1
+  fi
+
+  if [ ! -f "$target_dir/todo.txt" ] && [ ! -L "$target_dir/todo.txt" ]; then
+    return 0
+  fi
+
+  if git -C "$target_dir" check-ignore -q -- todo.txt && \
+    ! git -C "$target_dir" ls-files --error-unmatch todo.txt \
+      >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! git -C "$target_dir" add -- todo.txt; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to stage todo.txt."
+    return 1
+  fi
+
+  if git -C "$target_dir" diff --cached --quiet; then
+    return 0
+  fi
+
+  if ! gum spin --spinner dot --title "Creating todo.txt commit..." -- \
+    git -C "$target_dir" commit \
+      -m "chore(todo): add todo file" \
+      -m "Add a root todo.txt placeholder for bootstrap workflows."; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: todo.txt commit failed."
     return 1
   fi
 }
@@ -385,6 +437,13 @@ mkmod() {
   # chore: initial commit
   # --------------------------------------------------------------------------
   if ! cbc_create_empty_initial_commit "$target_dir"; then
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
+  # todo.txt
+  # --------------------------------------------------------------------------
+  if ! cbc_commit_todo_txt "$target_dir"; then
     return 1
   fi
 
@@ -794,9 +853,17 @@ mkrepo() {
     local existing_file
 
     if [ "$publish_github" = "true" ]; then
-      existing_file="$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'LICENSE' ! -name 'AGENTS.md' -print -quit 2>/dev/null)"
+      existing_file="$(
+        find "$target_dir" -mindepth 1 -maxdepth 1 \
+          ! -name '.git' ! -name 'README.md' ! -name 'LICENSE' \
+          ! -name 'AGENTS.md' ! -name 'todo.txt' -print -quit 2>/dev/null
+      )"
     else
-      existing_file="$(find "$target_dir" -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'README.md' ! -name 'AGENTS.md' -print -quit 2>/dev/null)"
+      existing_file="$(
+        find "$target_dir" -mindepth 1 -maxdepth 1 \
+          ! -name '.git' ! -name 'README.md' ! -name 'AGENTS.md' \
+          ! -name 'todo.txt' -print -quit 2>/dev/null
+      )"
     fi
 
     if [ -n "$existing_file" ]; then
@@ -862,10 +929,11 @@ mkrepo() {
       bash -c '
         if [ "$2" = "true" ]; then
           git -C "$1" add --all -- . ":(exclude)README.md" \
-            ":(exclude)LICENSE" ":(exclude)AGENTS.md"
+            ":(exclude)LICENSE" ":(exclude)AGENTS.md" \
+            ":(exclude)todo.txt"
         else
           git -C "$1" add --all -- . ":(exclude)README.md" \
-            ":(exclude)AGENTS.md"
+            ":(exclude)AGENTS.md" ":(exclude)todo.txt"
         fi
 
         if git -C "$1" diff --cached --quiet; then
@@ -878,6 +946,13 @@ mkrepo() {
       cbc_style_message "$CATPPUCCIN_RED" "Error: Existing files commit failed."
       return 1
     fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # todo.txt
+  # --------------------------------------------------------------------------
+  if ! cbc_commit_todo_txt "$target_dir"; then
+    return 1
   fi
 
   # --------------------------------------------------------------------------
@@ -1162,6 +1237,13 @@ mkskill() {
   fi
 
   # --------------------------------------------------------------------------
+  # todo.txt
+  # --------------------------------------------------------------------------
+  if ! cbc_commit_todo_txt "$target_dir"; then
+    return 1
+  fi
+
+  # --------------------------------------------------------------------------
   # SKILL.md
   # --------------------------------------------------------------------------
   printf '' > "$target_dir/SKILL.md"
@@ -1393,6 +1475,14 @@ mkzendocs() {
   if ! gum confirm "Bootstrap Zensical docs in this directory?"; then
     cbc_style_message "$CATPPUCCIN_YELLOW" "Canceled."
     return 0
+  fi
+
+  if [ "$in_git_repo" = "true" ]; then
+    if ! cbc_commit_todo_txt "$target_dir"; then
+      return 1
+    fi
+  elif ! cbc_ensure_todo_txt "$target_dir"; then
+    return 1
   fi
 
   commit_zendocs_paths() {
@@ -2020,11 +2110,18 @@ mkcommitlint() {
     initial_commit_action="create chore: initial commit"
   fi
 
+  local todo_action="create todo.txt"
+
+  if [ -e "$target_dir/todo.txt" ] || [ -L "$target_dir/todo.txt" ]; then
+    todo_action="keep existing todo.txt"
+  fi
+
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Commitlint Bootstrap" \
     "  Repository: $repo_name" \
     "  Path: $display_dir" \
     "  Branch: $current_branch" \
     "  Baseline commit: $initial_commit_action" \
+    "  Todo file: $todo_action" \
     "  Remote push: $push_action" \
     "  Package manager: $package_manager ($package_manager_source)" \
     "  Package version: $release_version ($release_version_source)" \
@@ -2094,6 +2191,13 @@ mkcommitlint() {
       "Create a clean repository baseline before adding commitlint automation."; then
       return 1
     fi
+  fi
+
+  # --------------------------------------------------------------------------
+  # todo.txt
+  # --------------------------------------------------------------------------
+  if ! cbc_commit_todo_txt "$target_dir"; then
+    return 1
   fi
 
   # --------------------------------------------------------------------------
