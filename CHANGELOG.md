@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.15](https://github.com/iop098321qwe/projectmod/compare/v0.0.14...v0.0.15) (2026-06-21)
+
+
+### Features
+
+* **mkzendocs:** open repo settings when docs workflow is created ([4f2ed4e](https://github.com/iop098321qwe/projectmod/commit/4f2ed4e5e95b9e90a790bdc72c85ea8f48ce87a3))
+* **mkzendocs:** show reminder after success box with gum warning ([6c82b07](https://github.com/iop098321qwe/projectmod/commit/6c82b070273409462e8459f604d9f1b288813201))
+
 ## [0.0.14](https://github.com/iop098321qwe/projectmod/compare/v0.0.13...v0.0.14) (2026-06-21)
 
 
