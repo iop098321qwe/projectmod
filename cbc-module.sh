@@ -2274,7 +2274,7 @@ mkcommitlint() {
   # --------------------------------------------------------------------------
   local gitignore_file="$target_dir/.gitignore"
 
-  local -a gitignore_entries=(.cache/ node_modules/ .husky/)
+  local -a gitignore_entries=(.cache/ node_modules/)
   local gitignore_entry
 
   if [ ! -f "$gitignore_file" ]; then
