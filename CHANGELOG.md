@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.18](https://github.com/iop098321qwe/projectmod/compare/v0.0.17...v0.0.18) (2026-06-22)
+
+
+### Features
+
+* **todo:** create done.txt during bootstrap ([13d10b7](https://github.com/iop098321qwe/projectmod/commit/13d10b7a9cd3f7c9a3bcf99ef7cc06449331a786))
+
+
+### Bug Fixes
+
+* **gitignore:** avoid blank lines on append ([2240398](https://github.com/iop098321qwe/projectmod/commit/22403987d0c1a0aeb96217e0838d9754a38dc852))
+
 ## [0.0.17](https://github.com/iop098321qwe/projectmod/compare/v0.0.16...v0.0.17) (2026-06-22)
 
 
