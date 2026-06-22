@@ -9,6 +9,9 @@ cbc_agents_file_purpose() {
   AGENTS.md)
     printf '%s' "AI coding agent instructions for this repository."
     ;;
+  done.txt)
+    printf '%s' "Root completed task list placeholder for bootstrap workflows."
+    ;;
   inbox.txt.tuxedo-lock)
     printf '%s' "Blank Tuxedo inbox lock file created alongside todo.txt."
     ;;
@@ -207,12 +210,20 @@ cbc_create_empty_initial_commit() {
 cbc_ensure_todo_txt() {
   local target_dir="$1"
   local todo_file="$target_dir/todo.txt"
+  local done_file="$target_dir/done.txt"
   local inbox_lock_file="$target_dir/inbox.txt.tuxedo-lock"
 
   if [ -e "$todo_file" ] || [ -L "$todo_file" ]; then
     :
   elif ! : > "$todo_file"; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create todo.txt."
+    return 1
+  fi
+
+  if [ -e "$done_file" ] || [ -L "$done_file" ]; then
+    :
+  elif ! : > "$done_file"; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create done.txt."
     return 1
   fi
 
@@ -230,7 +241,7 @@ cbc_ensure_todo_txt() {
 cbc_commit_todo_txt() {
   local target_dir="$1"
   local pathspec
-  local -a todo_bootstrap_files=(todo.txt inbox.txt.tuxedo-lock)
+  local -a todo_bootstrap_files=(todo.txt done.txt inbox.txt.tuxedo-lock)
 
   if ! cbc_ensure_todo_txt "$target_dir"; then
     return 1
@@ -261,7 +272,7 @@ cbc_commit_todo_txt() {
   if ! gum spin --spinner dot --title "Creating todo.txt commit..." -- \
     git -C "$target_dir" commit \
       -m "chore(todo): add todo files" \
-      -m "Add root todo.txt and inbox.txt.tuxedo-lock placeholders for bootstrap workflows."; then
+      -m "Add root todo.txt, done.txt, and inbox.txt.tuxedo-lock placeholders for bootstrap workflows."; then
     cbc_style_message "$CATPPUCCIN_RED" "Error: todo.txt commit failed."
     return 1
   fi
@@ -2179,10 +2190,11 @@ mkcommitlint() {
     initial_commit_action="create chore: initial commit"
   fi
 
-  local todo_action="create todo.txt"
+  local todo_action="create todo files"
 
-  if [ -e "$target_dir/todo.txt" ] || [ -L "$target_dir/todo.txt" ]; then
-    todo_action="keep existing todo.txt"
+  if ([ -e "$target_dir/todo.txt" ] || [ -L "$target_dir/todo.txt" ]) && \
+    ([ -e "$target_dir/done.txt" ] || [ -L "$target_dir/done.txt" ]); then
+    todo_action="keep existing todo files"
   fi
 
   cbc_style_box "$CATPPUCCIN_LAVENDER" "Commitlint Bootstrap" \
