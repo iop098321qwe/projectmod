@@ -1644,10 +1644,7 @@ EOF
   if [ -f "$gitignore_file" ]; then
     for gitignore_entry in "${gitignore_entries[@]}"; do
       if ! grep -Eq "^[[:space:]]*${gitignore_entry//\//\/}[[:space:]]*$" "$gitignore_file"; then
-        {
-          printf '\n'
-          printf '%s\n' "$gitignore_entry"
-        } >> "$gitignore_file" || {
+        printf '%s\n' "$gitignore_entry" >> "$gitignore_file" || {
           cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to update .gitignore."
           return 1
         }
@@ -2294,10 +2291,7 @@ mkcommitlint() {
   else
     for gitignore_entry in "${gitignore_entries[@]}"; do
       if ! grep -Eq "^[[:space:]]*${gitignore_entry//\//\/}[[:space:]]*$" "$gitignore_file"; then
-        {
-          printf '\n'
-          printf '%s\n' "$gitignore_entry"
-        } >> "$gitignore_file"
+        printf '%s\n' "$gitignore_entry" >> "$gitignore_file"
       fi
     done
   fi
