@@ -6,8 +6,8 @@ licensing, and git-flow defaults.
 
 New repository bootstraps start with an empty `chore: initial commit`, then
 record generated files as incremental Conventional Commits.
-Bootstrap flows that create `todo.txt` also create a blank
-`inbox.txt.tuxedo-lock` alongside it for Tuxedo todo workflows.
+Bootstrap flows that create `todo.txt` also create blank `done.txt` and
+`inbox.txt.tuxedo-lock` files alongside it for todo workflows.
 
 ## Functions
 
@@ -33,8 +33,8 @@ Bootstrap flows that create `todo.txt` also create a blank
 
 - `mkmod`, `mkrepo`, `mkskill`, and new-history `mkcommitlint` runs create an
   empty `chore: initial commit` before scaffold files are committed.
-- Bootstrap flows that add `todo.txt` also add a blank
-  `inbox.txt.tuxedo-lock` in the same directory.
+- Bootstrap flows that add `todo.txt` also add blank `done.txt` and
+  `inbox.txt.tuxedo-lock` files in the same directory.
 - Generated scaffold changes use separate Conventional Commits so each setup
   step remains reviewable.
 - Optional Zensical docs bootstraps run through `mkzendocs`, preserving its
