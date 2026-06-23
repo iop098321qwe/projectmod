@@ -1930,6 +1930,121 @@ PY
 }
 
 ################################################################################
+# DOCSITE
+################################################################################
+
+docsite() {
+  OPTIND=1
+
+  usage() {
+    cbc_style_box "$CATPPUCCIN_MAUVE" "Description:" \
+      "  Open the current repository's Zensical GitHub Pages site."
+
+    cbc_style_box "$CATPPUCCIN_BLUE" "Usage:" \
+      "  docsite [-h]"
+
+    cbc_style_box "$CATPPUCCIN_TEAL" "Options:" \
+      "  -h    Display this help message"
+
+    cbc_style_box "$CATPPUCCIN_PEACH" "Examples:" \
+      "  docsite"
+  }
+
+  while getopts ":h" opt; do
+    case ${opt} in
+    h)
+      usage
+      return 0
+      ;;
+    \?)
+      cbc_style_message "$CATPPUCCIN_RED" "Invalid option: -$OPTARG"
+      usage
+      return 1
+      ;;
+    esac
+  done
+
+  shift $((OPTIND - 1))
+
+  if [ "$#" -gt 0 ]; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: docsite does not accept arguments."
+    usage
+    return 1
+  fi
+
+  local cmd
+  for cmd in gum git gh xdg-open; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      cbc_style_message "$CATPPUCCIN_RED" "Error: missing required command: $cmd"
+      return 1
+    fi
+  done
+
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: docsite must run inside a git repository."
+    return 1
+  fi
+
+  local target_dir
+  target_dir="$(git rev-parse --show-toplevel)" || {
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Could not resolve git repository root."
+    return 1
+  }
+
+  if [ ! -f "$target_dir/zensical.toml" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" \
+      "Error: No Zensical docs configuration found in this repository."
+    return 1
+  fi
+
+  if [ ! -d "$target_dir/docs" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" \
+      "Error: No Zensical docs directory found in this repository."
+    return 1
+  fi
+
+  if [ ! -f "$target_dir/docs/index.md" ] && \
+    [ ! -f "$target_dir/docs/README.md" ] && \
+    [ ! -f "$target_dir/docs/CHANGELOG.md" ] && \
+    [ ! -f "$target_dir/docs/AGENTS.md" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" \
+      "Error: docs/ does not contain a Zensical entry page."
+    return 1
+  fi
+
+  local site_url
+  site_url="$({
+    grep -E '^[[:space:]]*site_url[[:space:]]*=' "$target_dir/zensical.toml" || true
+  } | sed -E 's/^[^=]*=[[:space:]]*"(.*)"[[:space:]]*$/\1/' | head -n 1)"
+
+  local repo_owner
+  local repo_name
+
+  repo_owner="$(gh repo view --json owner -q .owner.login 2>/dev/null)"
+  repo_name="$(gh repo view --json name -q .name 2>/dev/null)"
+
+  if [ -z "$repo_owner" ] || [ -z "$repo_name" ]; then
+    cbc_style_message "$CATPPUCCIN_RED" \
+      "Error: Could not resolve the current GitHub repository."
+    return 1
+  fi
+
+  if [ -z "$site_url" ]; then
+    site_url="https://$repo_owner.github.io/$repo_name/"
+  fi
+
+  if ! gum spin --spinner dot --title "Opening docs site..." -- \
+    xdg-open "$site_url" >/dev/null 2>&1; then
+    cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to open $site_url"
+    return 1
+  fi
+
+  cbc_style_box "$CATPPUCCIN_GREEN" "Docs site opened!" \
+    "  Repo: $repo_owner/$repo_name" \
+    "  URL: $site_url"
+}
+
+################################################################################
 # MKCOMMITLINT
 ################################################################################
 
