@@ -1895,7 +1895,7 @@ PY
   fi
 
   if ! commit_zendocs_paths \
-    "build(site): build site" \
+    "build(site): build zendocs docs site" \
     "Generate the static documentation site from Zensical output." \
     site; then
     return 1
