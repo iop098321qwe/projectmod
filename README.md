@@ -28,6 +28,9 @@ Bootstrap flows that create `todo.txt` also create blank `done.txt` and
   creating `zensical.toml`, creates incremental Conventional Commits for
   generated docs artifacts and root-doc symlinks, and pushes the current branch
   when a remote is configured.
+- `docsite`: Open the current repository's Zensical docs site in the default
+  browser. Requires running inside a git repository with `zensical.toml` and a
+  qualifying `docs/` entry page.
 
 ## Commit History
 
