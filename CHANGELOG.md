@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.19](https://github.com/iop098321qwe/projectmod/compare/v0.0.18...v0.0.19) (2026-06-23)
+
+
+### Features
+
+* **docsite:** open the repository docs site ([eed6628](https://github.com/iop098321qwe/projectmod/commit/eed6628889e081e527665641ccfe1ee7376a398b))
+
+
+### Bug Fixes
+
+* **mkzendocs:** update build commit wording for `mkzendocs` ([c1f3bc3](https://github.com/iop098321qwe/projectmod/commit/c1f3bc38c1fafea8725087452acc6264a42f88e1))
+
 ## [0.0.18](https://github.com/iop098321qwe/projectmod/compare/v0.0.17...v0.0.18) (2026-06-22)
 
 
