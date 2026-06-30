@@ -1,1 +1,2 @@
-(A) ensure that .gitignore file is formatted cleaner @fix
+(B) ensure that .gitignore file is formatted cleaner @fix
+(A) commands that bootstrap projects should prompt for README title/header @feature
