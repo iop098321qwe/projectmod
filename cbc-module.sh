@@ -2423,7 +2423,7 @@ mkcommitlint() {
   # --------------------------------------------------------------------------
   if [ "$create_package_json" = "true" ]; then
     if ! gum spin --spinner dot --title "Creating package.json..." -- \
-      bash -c 'cd "$1" && npm init -y' _ "$target_dir"; then
+      bash -c 'cd "$1" && npm init -y && npm pkg set license=GPL-3.0-or-later' _ "$target_dir"; then
       cbc_style_message "$CATPPUCCIN_RED" "Error: Failed to create package.json."
       return 1
     fi
