@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [0.0.20](https://github.com/iop098321qwe/projectmod/compare/v0.0.19...v0.0.20) (2026-10-27)
+
+### Bug Fixes
+
+* **bootstrap:** generate packages with GPL-3.0-or-later licensing ([ad99044](https://github.com/iop098321qwe/projectmod/commit/ad99044ef811a73f2f89b697ae7f092b400f5b56))
+
 ## [0.0.19](https://github.com/iop098321qwe/projectmod/compare/v0.0.18...v0.0.19) (2026-06-23)
 
 
