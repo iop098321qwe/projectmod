@@ -48,3 +48,22 @@ Bootstrap flows that create `todo.txt` also create blank `done.txt` and
 ## Aliases
 
 - None.
+
+## Loading and tests
+
+With CBC's `cbc_lazy_register` helper, `cbc-module.sh` registers command names
+immediately and loads `projectmod.sh` on the first command invocation. Older
+CBC versions and standalone sourcing load the same implementation eagerly.
+All existing command arguments and current-shell behavior are preserved.
+Reloading the entrypoint registers fresh wrappers.
+
+Run the loading regression check from this repository root:
+
+```bash
+bash tests/test_loading.sh
+```
+
+To also test lazy loading and reloads, set `CBC_TEST_SCRIPT` to the absolute
+path of a CBC script providing `cbc_lazy_register` before running the check.
+The test uses a temporary home, compares help output for every public command,
+and performs no repository bootstrap or publishing.
